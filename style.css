@@ -1,0 +1,35 @@
+body { margin: 0; }
+
+#data { right: 0; }
+#settings { left: 0; }
+
+#settings {
+  top: 0;
+  flex: 1;
+  margin: 5px;
+  padding: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  position: absolute;
+  align-items: center;
+  border-radius: 10px;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid #333;
+  background-color: #777;
+}
+
+#settings > div {
+  margin: 5px;
+  padding: 5px;
+}
+
+select, label {
+  margin: 0;
+  padding: 5px;
+  color: #999;
+  cursor: pointer;
+  border-radius: 5px;
+  border: 1px solid #111;
+  background-color: #333;
+}

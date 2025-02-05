@@ -1,21 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8">
-		<title>MJS</title>
-		<style>
-			body { margin: 0; }
-		</style>
-		<script type="importmap">
-			{
-				"imports": {
-					"three": "https://unpkg.com/three@0.171.0/build/three.module.js",
-					"three/addons/": "https://unpkg.com/three@0.171.0/examples/jsm/"
-				}
-			}
-		</script>
-	</head>
-	<body>
-		<script type="module" src="main.js"></script>
-	</body>
+  <head>
+    <meta charset="utf-8">
+    <title>MapJS</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.171.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.171.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="settings">
+      <select id="type">
+        <option value="Valve.MAP">Valve .MAP</option>
+        <option value="Quake.MAP">Quake .MAP</option>
+        <!-- <option value="Valve.BSP">Valve .BSP</option> -->
+      </select>
+
+      <input type="file" id="map" accept=".map" name="mapfilename" hidden>
+      <input type="file" id="wad" accept=".wad" name="wadfilename" hidden>
+
+      <div>
+        <label for="map">Choose MAP</label>
+        <label id="map_name"> </label>
+      </div>
+
+      <div>
+        <label for="wad">Choose WAD</label>
+        <label id="wad_name"> </label>
+      </div>
+    </div>
+  </body>
+  <script type="module" src="main.js"></script>
 </html>
