@@ -9,6 +9,7 @@ body { margin: 0; }
   margin: 5px;
   padding: 5px;
   display: flex;
+  max-width: 25%;
   flex-wrap: wrap;
   position: absolute;
   align-items: center;
@@ -22,6 +23,10 @@ body { margin: 0; }
 #settings > div {
   margin: 5px;
   padding: 5px;
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  justify-content: center;
 }
 
 select, label {
@@ -32,4 +37,28 @@ select, label {
   border-radius: 5px;
   border: 1px solid #111;
   background-color: #333;
+}
+
+#collapsible_btn {
+  padding: 5px;
+  border-radius: 5px;
+}
+
+#collapsible_section {
+  height: 64px;
+  display: flex;
+  max-height: 0;
+  flex-wrap: wrap;
+  overflow: hidden;
+  overflow-y: scroll;
+  align-items: center;
+  flex-direction: row;
+  justify-content: center;
+  transition: max-height 0.2s ease-out;
+}
+
+#collapsible_section > canvas {
+  margin: 5px;
+  width: 64px;
+  height: auto;
 }
