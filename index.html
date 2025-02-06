@@ -15,12 +15,6 @@
   </head>
   <body>
     <div id="settings">
-      <select id="type">
-        <option value="Valve.MAP">Valve .MAP</option>
-        <option value="Quake.MAP">Quake .MAP</option>
-        <!-- <option value="Valve.BSP">Valve .BSP</option> -->
-      </select>
-
       <input type="file" id="map" accept=".map" name="mapfilename" hidden>
       <input type="file" id="wad" accept=".wad" name="wadfilename" hidden>
 
@@ -40,23 +34,5 @@
       </div>
     </div>
   </body>
-  <script>
-    function toggleCollapsibleSection( e ) {
-      const section = document.getElementById( 'collapsible_section' );
-
-      section.classList.toggle( 'active' );
-
-      if ( section.style.maxHeight )
-        section.style.maxHeight = null;
-      else
-        section.style.maxHeight = section.scrollHeight + "px";
-    }
-
-    document.addEventListener( "DOMContentLoaded", ( e ) => {
-      const toggle = document.getElementById( 'collapsible_btn' );
-
-      toggle.onclick = toggleCollapsibleSection;
-    });
-  </script>
   <script type="module" src="main.js"></script>
 </html>
