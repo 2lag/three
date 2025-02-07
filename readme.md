@@ -1,13 +1,14 @@
-### todo]
- - remove shitty ai code ( we dont want none of that, just rapid prototyping for a side tool that i wanted to exist )
-  - make sure all associated data is used for each brush plane
- - add 3d fly-around cam
+### todo
  - test other maps
    - dm1 quake map
+ - fix resize
+ - go through all comments / todo's
  - clean all this fucking code its a mess
  - load c1a0 as default map
  - test map loading from file upload
  - test wad loading from file upload
- - add togglable keybinds with list @ bottom right
- - add fps to top right with a graph
+ - remove all remaining comments
+ - add keybinds somewhere
+ - redesign ui to be more minimalistic
+ - test mobile
  - should be done

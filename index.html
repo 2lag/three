@@ -20,19 +20,23 @@
 
       <div>
         <label for="map">Choose MAP</label>
-        <label id="map_name"> </label>
+        <span id="map_name"> </span>
       </div>
 
       <div>
         <label for="wad">Choose WAD</label>
-        <label id="wad_name"> </label>
+        <span id="wad_name"> </span>
       </div>
 
-      <div>
-        <button type="button" id="collapsible_btn">+</button>
-        <div id="collapsible_section"></div>
-      </div>
+      <button type="button" id="collapsible_btn">+</button>
+      <div id="collapsible_section"></div>
+    </div>
+
+    <div id="info">
+      <div id="fps"></div>
+      <span id="tagline">made by <a href="https://kuso.day" target="_blank" class="sparkle">day</a></span>
     </div>
   </body>
+  <script>javascript:(function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.body.appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='https://mrdoob.github.io/stats.js/build/stats.min.js';document.head.appendChild(script);})()</script>
   <script type="module" src="main.js"></script>
 </html>

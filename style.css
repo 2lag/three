@@ -1,3 +1,9 @@
+:root {
+  --back: #000;
+}
+
+html { overflow: hidden; }
+
 body { margin: 0; }
 
 #data { right: 0; }
@@ -39,7 +45,7 @@ label, #collapsible_btn {
   background-color: #333;
 }
 
-#collapsible_btn {
+span, #collapsible_btn {
   margin: 5px !important;
 }
 
@@ -52,6 +58,7 @@ label, #collapsible_btn {
   overflow-y: scroll;
   align-items: center;
   flex-direction: row;
+  padding: 0 !important;
   justify-content: center;
   border: 1px solid #111;
   transition: max-height 0.2s ease-in-out;
@@ -61,4 +68,84 @@ label, #collapsible_btn {
   margin: 5px;
   width: 64px;
   height: auto;
+}
+
+#info {
+  flex: 1;
+  right: 0;
+  bottom: 0;
+  margin: 5px;
+  padding: 5px;
+  display: flex;
+  max-width: 25%;
+  flex-wrap: wrap;
+  position: absolute;
+  align-items: center;
+  border-radius: 10px;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid #333;
+  background-color: #777;
+}
+
+#fps > div {
+  position: relative !important;
+}
+
+/* TAGLINE SPARKLE ONLY BELOW HERE */
+.sparkle {
+  text-shadow: 0px 0px 10px black;
+  position: relative;
+  font-weight: 700;
+  color: #000;
+}
+
+.star {
+  --star-color: #710ff1;
+  --star-size: 50px;
+  --start-left: 0px;
+  --start-top: 0px;  
+  --star-life: 5s;
+  --end-left: 0px;
+  --end-top: 0px;
+  
+  animation: slide var( --star-life ) ease-in forwards;
+  background: var( --star-color );
+  height: var( --star-size );
+  width: var( --star-size );
+  left: var( --end-left );
+  top: var( --end-top );
+  
+  mix-blend-mode: lighten;
+  position: absolute;
+}
+
+.star:after {
+  box-shadow: var( --star-size ) var( --star-size ) var( --back ),
+              var( --star-size ) 0px var( --back ),
+              0px var( --star-size ) var( --back );
+  left: calc( var( --star-size ) / 2 * -1 );
+  top: calc( var( --star-size ) / 2 * -1 );
+  background-color: var( --back );
+  height: var( --star-size );
+  width: var( --star-size );
+  border-radius: 100%;
+  position: relative;
+  display: block;
+  content: "";
+}
+
+@keyframes slide {
+  0%{
+    transform: rotate( 0deg );
+    left: var( --start-left );
+    top: var( --start-top );
+    opacity: 0;
+  }
+  100%{
+    transform: rotate( calc( 180deg * var( --star-life-num ) ) ) scale( 0.5 );
+    left: var( --end-left );
+    top: var( --end-top );
+    opacity: 1;
+  }
 }

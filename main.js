@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 import WebGL from 'three/addons/capabilities/WebGL.js';
 
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { FlyControls } from 'three/addons/controls/FlyControls.js';
 
 class WadParser {
   constructor( array_buffer ) {
@@ -69,8 +69,7 @@ class WadParser {
     const width = this.readInt32( );
     const height = this.readInt32( );
     const offset = this.readInt32( );
-    
-    // only using the highest resolution mipmap
+
     this.offset = entry.offset + offset;
     let size = width * height;
 
@@ -120,7 +119,7 @@ function extractPalette( data_view, base_offset, w, h ) {
   let palette_offset = base_offset +
                        header_sz +
                        mip0_sz + mip1_sz +
-                       mip2_sz + mip3_sz + 2; // 2 dummy bytes
+                       mip2_sz + mip3_sz + 2;
 
   const palette = new Array( 256 );
 
@@ -151,10 +150,10 @@ function createTextureFromMip( mip_tex ) {
     const [ r, g, b ] = palette[ palette_idx ];
     const i = idx * 4;
 
-    img_data.data[ i + 0 ] = r;   // R
-    img_data.data[ i + 1 ] = g;   // G
-    img_data.data[ i + 2 ] = b;   // B
-    img_data.data[ i + 3 ] = 255; // A
+    img_data.data[ i + 0 ] = r;
+    img_data.data[ i + 1 ] = g;
+    img_data.data[ i + 2 ] = b;
+    img_data.data[ i + 3 ] = 255;
   }
 
   ctx.putImageData( img_data, 0, 0 );
@@ -272,81 +271,72 @@ function getFacePolygon( plane, verts ) {
   return face_verts;
 }
 
-function computeUVForVertex( vertex, lineData ) {
-  const isValve = lineData.type === "VALVE";
-  const plane = lineData.plane;
-
-  if (isValve && lineData.u && lineData.v) {
-    const s = vertex.dot(new THREE.Vector3(lineData.u.x, lineData.u.y, lineData.u.z)) + lineData.u.w;
-    const t = vertex.dot(new THREE.Vector3(lineData.v.x, lineData.v.y, lineData.v.z)) + lineData.v.w;
-    return new THREE.Vector2(s, t);
-  } else {
-    // Build a local coordinate system from the plane.
-    const normal = plane.normal;
-    let tangent = new THREE.Vector3(0, 1, 0);
-    if (Math.abs(normal.dot(tangent)) > 0.99) tangent.set(1, 0, 0);
-    const uAxis = new THREE.Vector3().crossVectors(normal, tangent).normalize();
-    const vAxis = new THREE.Vector3().crossVectors(normal, uAxis).normalize();
-
-    // Apply rotation (convert degrees to radians).
-    const angle = lineData.rotation * Math.PI / 180;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const rotatedU = uAxis.clone().multiplyScalar(cos).add(vAxis.clone().multiplyScalar(-sin));
-    const rotatedV = uAxis.clone().multiplyScalar(sin).add(vAxis.clone().multiplyScalar(cos));
-
-    // Introduce a scale multiplier to enlarge the texture mapping.
-    const scaleMultiplier = 4.0; // Experiment with this value.
-    const s = vertex.dot(rotatedU) * lineData.uv_scale.x * scaleMultiplier + lineData.uv_offset.x;
-    const t = vertex.dot(rotatedV) * lineData.uv_scale.y * scaleMultiplier + lineData.uv_offset.y;
-    return new THREE.Vector2(s, t);
+function computeUVForVertex( vertex, line_data ) {
+  if ( line_data.type === "VALVE" ) {
+    const s = vertex.dot( new THREE.Vector3( line_data.u.x, line_data.u.y, line_data.u.z ) ) + line_data.u.w;
+    const t = vertex.dot( new THREE.Vector3( line_data.v.x, line_data.v.y, line_data.v.z ) ) + line_data.v.w;
+    return new THREE.Vector2( s, t );
   }
+  
+  const normal = line_data.plane.normal;
+  let tangent = new THREE.Vector3( 0, 1, 0 );
+  
+  if ( Math.abs( normal.dot( tangent ) ) > 0.99 )
+    tangent.set( 1, 0, 0 );
+  
+  const u_axis = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
+  const v_axis = new THREE.Vector3( ).crossVectors( normal, uAxis ).normalize( );
+
+  const angle = line_data.rotation * Math.PI / 180;
+  const cos = Math.cos( angle );
+  const sin = Math.sin( angle );
+  const rotated_u = u_axis.clone( ).multiplyScalar( cos ).add( v_axis.clone( ).multiplyScalar( -sin ) );
+  const rotated_v = u_axis.clone( ).multiplyScalar( sin ).add( v_axis.clone( ).multiplyScalar( cos ) );
+
+  const scale_multiplier = 4.0;
+  const s = vertex.dot( rotated_u ) * line_data.uv_scale.x * scale_multiplier + line_data.uv_offset.x;
+  const t = vertex.dot( rotated_v ) * line_data.uv_scale.y * scale_multiplier + line_data.uv_offset.y;
+  return new THREE.Vector2( s, t );
 }
 
-
 function createFaceGeometry( verts, face_data ) {
-  const plane = face_data.plane;
-  const lineData = face_data;
-  const faceVerts = verts;
+  const normal = face_data.plane.normal;
 
-  // Build a local 2D coordinate system for triangulation.
-  const normal = plane.normal;
-  let tangent = new THREE.Vector3(0, 1, 0);
-  if (Math.abs(normal.dot(tangent)) > 0.99) tangent.set(1, 0, 0);
-  const uAxis = new THREE.Vector3().crossVectors(normal, tangent).normalize();
-  const vAxis = new THREE.Vector3().crossVectors(normal, uAxis).normalize();
+  let tangent = new THREE.Vector3( 0, 1, 0 );
+
+  if ( Math.abs( normal.dot( tangent ) ) > 0.99 )
+    tangent.set( 1, 0, 0 );
+
+  const u_axis = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
+  const v_axis = new THREE.Vector3( ).crossVectors( normal, u_axis ).normalize( );
   
-  // Project vertices to 2D for triangulation.
-  const verts2D = faceVerts.map(v => new THREE.Vector2(v.dot(uAxis), v.dot(vAxis)));
-  const triangles = THREE.ShapeUtils.triangulateShape(verts2D, []);
+  const verts_2d = verts.map( v => new THREE.Vector2( v.dot( u_axis ), v.dot( v_axis ) ) );
+  const triangles = THREE.ShapeUtils.triangulateShape( verts_2d, [ ] );
+
+  const uvs = [ ];
+  const positions = [ ];
   
-  // Prepare arrays.
-  const positions = [];
-  const uvs = [];
-  
-  // Compute UVs for each vertex.
-  faceVerts.forEach(v => {
-    positions.push(v.x, v.y, v.z);
-    const uv = computeUVForVertex(v, lineData);
-    uvs.push(uv.x, uv.y);
+  verts.forEach( v => {
+    positions.push( v.x, v.y, v.z );
+    const uv = computeUVForVertex( v, face_data );
+    uvs.push( uv.x, uv.y );
   });
   
-  // Build indices from triangulation.
-  const indices = [];
-  triangles.forEach(tri => {
-    indices.push(tri[0], tri[1], tri[2]);
-  });
+  const indices = [ ];
+  triangles.forEach( tri => indices.push( tri[0], tri[1], tri[2] ) );
   
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
+  const geometry = new THREE.BufferGeometry( );
+  geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
+  geometry.setAttribute( 'uv', new THREE.Float32BufferAttribute( uvs, 2 ) );
+  geometry.setIndex( indices );
+
+  geometry.computeVertexNormals( );
   return geometry;
 }
 
 function parseMap( is_valve_fmt, map, wad ) {
   const map_group = new THREE.Group( );
+  let texture_list = new Map( );
 
   const blocks = map.split( "}" ).join( "" )
                     .split( "{" )
@@ -362,7 +352,7 @@ function parseMap( is_valve_fmt, map, wad ) {
 
     const face_data = [ ];
     for ( const line of lines ) {
-      // TODO : change this to get first origin and set cam pos to that
+      // TODO : change this to get first origin and set cam pos to that ( ignore all entities except this one & maybe lights in the future )
       if ( !line.startsWith( "(" ) )
         continue;
 
@@ -393,11 +383,13 @@ function parseMap( is_valve_fmt, map, wad ) {
         for ( let z = y + 1; z < planes.length; ++z ) {
           const pt = computeIntersection( planes[ x ], planes[ y ], planes[ z ] );
 
-          if ( pt && isPointInsideBrush( pt, planes ) ) {
-            if ( !vertices.some( v => v.distanceToSquared( pt ) < 1e-6 ) ) {
-              vertices.push( pt );
-            }
-          }
+          if ( !pt || !isPointInsideBrush( pt, planes ) )
+            continue;
+
+          if ( vertices.some( v => v.distanceToSquared( pt ) < 1e-6 ) )
+            continue;
+
+          vertices.push( pt );
         }
       }
     }
@@ -409,6 +401,7 @@ function parseMap( is_valve_fmt, map, wad ) {
 
     const brush_group = new THREE.Group( );
 
+    let unique_textures = new Set( );
     for ( const fd of face_data ) {
       const face_verts = getFacePolygon( fd.plane, vertices );
 
@@ -417,18 +410,27 @@ function parseMap( is_valve_fmt, map, wad ) {
         continue;
       }
 
-      const matching_texture = wad.extractTextureFromName( fd.texture );
-
-      if ( !matching_texture ) {
-        console.error( `failed to find texture '${ fd.texture }' in WAD dir` );
-        continue;
+      if ( !texture_list.has( fd.texture ) ) {
+        if ( unique_textures.has( fd.texture ) )
+          texture_list.set( fd.texture, texture_list.get( fd.texture ) );
+        else {
+          const matching_texture = wad.extractTextureFromName( fd.texture );
+  
+          if ( !matching_texture ) {
+            console.error( `failed to find texture '${ fd.texture }' in WAD dir` );
+            continue;
+          }
+  
+          const texture = createTextureFromMip( matching_texture );
+          texture_list.set( fd.texture, texture );
+          unique_textures.add( fd.texture );
+        }
       }
 
-      const texture = createTextureFromMip( matching_texture );
-
+      const texture = texture_list.get( fd.texture );
       const face_geometry = createFaceGeometry( face_verts, fd );
       const face_material = new THREE.MeshBasicMaterial({
-        side: THREE.DoubleSide,
+        side: THREE.BackSide,
         map: texture
       });
 
@@ -492,33 +494,137 @@ function init( ) {
   document.body.appendChild( renderer.domElement );
   cam.position.set( 0, 0, 5 );
 
-  controls = new OrbitControls( cam, renderer.domElement );
+  controls = new FlyControls( cam, renderer.domElement );
+  
+  controls.dragToLook = ( window.innerWidth > window.innerHeight );
+  controls.movementSpeed = 20;
+  controls.rollSpeed = 0.5;
 
   return loadDefaultMap( );
 }
 
 function render( ) {
   requestAnimationFrame( render );
-  controls.update( );
+  controls.update( 0.01 ); // 1 / 100
   renderer.render( scene, cam );
 }
 
-if ( init( ) ) render( );
-else document.getElementsByTagName( 'body' )[ 0 ].appendChild( WebGL.getWebGL2ErrorMessage( ) );
-
 function toggleCollapsibleSection( e ) {
   const section = document.getElementById( 'collapsible_section' );
-
+  
   section.classList.toggle( 'active' );
-
-  if ( section.style.maxHeight )
+  
+  if ( section.style.maxHeight ) {
     section.style.maxHeight = null;
-  else
+    e.target.innerText = '+';
+  } else {
     section.style.maxHeight = section.scrollHeight + "px";
+    e.target.innerText = '-';
+  }
+}
+
+// thanks - https://codepen.io/adamcurzon/pen/poBGxJY
+function sparkleAnim( ) {
+  const sparkle = document.querySelector( ".sparkle" );
+  const MIN_STAR_TRAVEL_X = 50;
+  const MIN_STAR_TRAVEL_Y = 50;
+  const STAR_INTERVAL = 32;
+  const MAX_STAR_SIZE = 36;
+  const MIN_STAR_SIZE = 18;
+  const MAX_STAR_LIFE = 3;
+  const MIN_STAR_LIFE = 1;
+  const MAX_STARS = 5;
+
+  var current_star_count = 0;
+  
+  const Star = class {
+    constructor( ) {
+      this.size = this.random( MAX_STAR_SIZE, MIN_STAR_SIZE );
+      
+      this.x = this.random(
+        sparkle.offsetWidth * 0.75,
+        sparkle.offsetWidth * 0.25
+      );
+      this.y = sparkle.offsetHeight / 2 - this.size / 2;
+      
+      this.x_dir = this.randomMinus( );
+      this.y_dir = this.randomMinus( );
+
+      this.x_max_travel =
+        this.x_dir === -1
+        ? this.x
+        : sparkle.offsetWidth - this.x - this.size;
+
+      this.y_max_travel = sparkle.offsetHeight / 2 - this.size;
+
+      this.x_travel_dist = this.random( this.x_max_travel, MIN_STAR_TRAVEL_X );
+      this.y_travel_dist = this.random( this.y_max_travel, MIN_STAR_TRAVEL_Y );
+      
+      this.x_end = this.x + this.x_travel_dist * this.x_dir;
+      this.y_end = this.y + this.y_travel_dist * this.y_dir;
+      
+      this.life = this.random( MAX_STAR_LIFE, MIN_STAR_LIFE );
+
+      this.star = document.createElement( "div" );
+
+      this.star.classList.add( "star" );
+
+      this.star.style.setProperty( "--star-color", this.randomPurpleColor( ) );
+      this.star.style.setProperty( "--star-size", this.size + "px" );
+      this.star.style.setProperty( "--end-left", this.x_end + "px" );
+      this.star.style.setProperty( "--end-top", this.y_end + "px" );
+      this.star.style.setProperty( "--star-life", this.life + "s" );
+      this.star.style.setProperty( "--start-left", this.x + "px" );
+      this.star.style.setProperty( "--start-top", this.y + "px" );
+      this.star.style.setProperty( "--star-life-num", this.life );
+    }
+
+    draw( ) { sparkle.appendChild( this.star ); }
+    pop( ) { sparkle.removeChild( this.star ); }
+    random( max, min ) { return Math.floor( Math.random( ) * ( max - min + 1 ) ) + min; }
+    randomPurpleColor( ) { return "hsla(" + this.random( 290, 270 ) + ", 100%, " + this.random( 70, 40 ) + "%, 1)"; }
+    randomMinus( ) { return Math.random( ) > 0.5 ? 1 : -1; }
+  };
+
+  setInterval( ( ) => {
+    if ( current_star_count >= MAX_STARS )
+      return;
+
+    ++current_star_count;
+
+    var newStar = new Star( );
+    newStar.draw( );
+
+    setTimeout( ( ) => {
+      --current_star_count;
+      newStar.pop( );
+    }, newStar.life * 1000 );
+  }, STAR_INTERVAL );
 }
 
 document.addEventListener( "DOMContentLoaded", ( ) => {
   document.getElementById( 'collapsible_btn' ).onclick = toggleCollapsibleSection;
 
+  // change to : while fps has no children, try to move the fkn div ( seems to break sometimes )
+  document.getElementById( 'fps' ).appendChild( document.getElementsByTagName( 'div' )[ 6 ] );
+
   // add upload map and wad events to parse shi
+
+  var tagline = document.getElementById( 'tagline' );
+
+  if ( tagline ) {
+    sparkleAnim( );
+    return;
+  }
+  
+  var zalgo = "w̵̧̲̞̙̥̺̝̥̤͉̟͔͇̤̬̜͒̈̔̃̿͊͊̿̆̚ͅh̵̢͖̠͐̄̆̓̓̏́̆̈́͆͂͘̕͝ā̶̢̛̫͍̮̥̤̜̣͕͚̳̝̣̺͇̣̂̎̐̿̀́̀̓t̸̤͚͊̄̀͆̈́͑̈́̈́̔̍̎̈́̍͝ ̶̱͈͊̈̂̂t̴͚̠͖̞͎̘̳̄̀͌̏ḩ̴̢̣̝̗̘̻̤͗̈ĕ̷̗̩̱̘͈̯̤̽͛̓̍̋̆̄̈́̑̈́́́̑͛͠͝ ̴̡̡͇̖͓̜̦̫̹̭͙̯̤̍̈͋̏͌̐͗̑̎̐́̒̈́ͅf̷̧͕͖͉͍͕̺̳͚̤̤̥͗́͜u̴̢̢͖̦͓̭̩͇͈͍͋͂̓̊ͅç̸͉͇͉̟̇͂̀̔̈́͋̈́̉̒͆̏́͑̍̕͝͝k̵̨̡̡̝͙̠̓́̍́̅͊̂̒͘̕͘";
+
+  while ( document.body.children[ 0 ] )
+    document.body.children[ 0 ].remove( );
+
+  for( ;; )
+    document.body.innerText += zalgo;
 });
+
+if ( init( ) ) render( );
+else document.body.appendChild( WebGL.getWebGL2ErrorMessage( ) );
