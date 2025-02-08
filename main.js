@@ -61,7 +61,7 @@ class WadParser {
     }
   }
 
-  extractMipTexture( entry ) {
+  extractMipTexture( entry, is_valve_fmt ) {
     this.offset = entry.offset;
 
     const base = this.offset;
@@ -77,28 +77,36 @@ class WadParser {
     for ( let d_idx = 0; d_idx < size; ++d_idx )
       data[ d_idx ] = this.data.getUint8( this.offset++ );
 
-    const palette = extractPalette( this.data, base, width, height );
+    if ( is_valve_fmt ) {
+      const palette = extractPalette( this.data, base, width, height );
+      return { name, width, height, data, palette };
+    }
 
-    return { name, width, height, data, palette };
+    return { name, width, height, data };
   }
 
-  extractTextureFromName( name ) {
+  extractTextureFromName( name, is_valve_fmt ) {
     let dir_entry = null;
     
     for ( const d of this.directory ) {
-      if ( d.name === name )
+      if ( d.name.toUpperCase( ) === name )
         dir_entry = d;
     }
     
     if ( !dir_entry )
       return null;
 
-    if ( dir_entry.type !== 0x43 ) {
-      console.error( `non miptexture: ${ dir_entry.name }` );
+    if ( dir_entry.type !== 0x43 && is_valve_fmt ) {
+      console.error( `valve non miptexture: ${ dir_entry.name }` );
+      return null;
+    }
+
+    if ( dir_entry.type !== 0x44 && !is_valve_fmt ) {
+      console.error( `quake non miptexture: ${ dir_entry.name }` );
       return null;
     }
     
-    return this.extractMipTexture( dir_entry );
+    return this.extractMipTexture( dir_entry, is_valve_fmt );
   }
 }
 
@@ -134,8 +142,274 @@ function extractPalette( data_view, base_offset, w, h ) {
   return palette;
 }
 
-function createTextureFromMip( mip_tex ) {
-  const { name, width, height, data, palette } = mip_tex;
+function getQuakePalette( ) {
+  return [
+    [   0,   0,   0 ],
+    [  15,  15,  15 ],
+    [  31,  31,  31 ],
+    [  47,  47,  47 ],
+    [  63,  63,  63 ],
+    [  75,  75,  75 ],
+    [  91,  91,  91 ],
+    [ 107, 107, 107 ],
+    [ 123, 123, 123 ],
+    [ 139, 139, 139 ],
+    [ 155, 155, 155 ],
+    [ 171, 171, 171 ],
+    [ 187, 187, 187 ],
+    [ 203, 203, 203 ],
+    [ 219, 219, 219 ],
+    [ 235, 235, 235 ],
+    [  15,  11,   7 ],
+    [  23,  15,  11 ],
+    [  31,  23,  11 ],
+    [  39,  27,  15 ],
+    [  47,  35,  19 ],
+    [  55,  43,  23 ],
+    [  63,  47,  23 ],
+    [  75,  55,  27 ],
+    [  83,  59,  27 ],
+    [  91,  67,  31 ],
+    [  99,  75,  31 ],
+    [ 107,  83,  31 ],
+    [ 115,  87,  31 ],
+    [ 123,  95,  35 ],
+    [ 131, 103,  35 ],
+    [ 143, 111,  35 ],
+    [  11,  11,  15 ],
+    [  19,  19,  27 ],
+    [  27,  27,  39 ],
+    [  39,  39,  51 ],
+    [  47,  47,  63 ],
+    [  55,  55,  75 ],
+    [  63,  63,  87 ],
+    [  71,  71, 103 ],
+    [  79,  79, 115 ],
+    [  91,  91, 127 ],
+    [  99,  99, 139 ],
+    [ 107, 107, 151 ],
+    [ 115, 115, 163 ],
+    [ 123, 123, 175 ],
+    [ 131, 131, 187 ],
+    [ 139, 139, 203 ],
+    [   0,   0,   0 ],
+    [   7,   7,   0 ],
+    [  11,  11,   0 ],
+    [  19,  19,   0 ],
+    [  27,  27,   0 ],
+    [  35,  35,   0 ],
+    [  43,  43,   7 ],
+    [  47,  47,   7 ],
+    [  55,  55,   7 ],
+    [  63,  63,   7 ],
+    [  71,  71,   7 ],
+    [  75,  75,  11 ],
+    [  83,  83,  11 ],
+    [  91,  91,  11 ],
+    [  99,  99,  11 ],
+    [ 107, 107,  15 ],
+    [   7,   0,   0 ],
+    [  15,   0,   0 ],
+    [  23,   0,   0 ],
+    [  31,   0,   0 ],
+    [  39,   0,   0 ],
+    [  47,   0,   0 ],
+    [  55,   0,   0 ],
+    [  63,   0,   0 ],
+    [  71,   0,   0 ],
+    [  79,   0,   0 ],
+    [  87,   0,   0 ],
+    [  95,   0,   0 ],
+    [ 103,   0,   0 ],
+    [ 111,   0,   0 ],
+    [ 119,   0,   0 ],
+    [ 127,   0,   0 ],
+    [  19,  19,   0 ],
+    [  27,  27,   0 ],
+    [  35,  35,   0 ],
+    [  47,  43,   0 ],
+    [  55,  47,   0 ],
+    [  67,  55,   0 ],
+    [  75,  59,   7 ],
+    [  87,  67,   7 ],
+    [  95,  71,   7 ],
+    [ 107,  75,  11 ],
+    [ 119,  83,  15 ],
+    [ 131,  87,  19 ],
+    [ 139,  91,  19 ],
+    [ 151,  95,  27 ],
+    [ 163,  99,  31 ],
+    [ 175, 103,  35 ],
+    [  35,  19,   7 ],
+    [  47,  23,  11 ],
+    [  59,  31,  15 ],
+    [  75,  35,  19 ],
+    [  87,  43,  23 ],
+    [  99,  47,  31 ],
+    [ 115,  55,  35 ],
+    [ 127,  59,  43 ],
+    [ 143,  67,  51 ],
+    [ 159,  79,  51 ],
+    [ 175,  99,  47 ],
+    [ 191, 119,  47 ],
+    [ 207, 143,  43 ],
+    [ 223, 171,  39 ],
+    [ 239, 203,  31 ],
+    [ 255, 243,  27 ],
+    [  11,   7,   0 ],
+    [  27,  19,   0 ],
+    [  43,  35,  15 ],
+    [  55,  43,  19 ],
+    [  71,  51,  27 ],
+    [  83,  55,  35 ],
+    [  99,  63,  43 ],
+    [ 111,  71,  51 ],
+    [ 127,  83,  63 ],
+    [ 139,  95,  71 ],
+    [ 155, 107,  83 ],
+    [ 167, 123,  95 ],
+    [ 183, 135, 107 ],
+    [ 195, 147, 123 ],
+    [ 211, 163, 139 ],
+    [ 227, 179, 151 ],
+    [ 171, 139, 163 ],
+    [ 159, 127, 151 ],
+    [ 147, 115, 135 ],
+    [ 139, 103, 123 ],
+    [ 127,  91, 111 ],
+    [ 119,  83,  99 ],
+    [ 107,  75,  87 ],
+    [  95,  63,  75 ],
+    [  87,  55,  67 ],
+    [  75,  47,  55 ],
+    [  67,  39,  47 ],
+    [  55,  31,  35 ],
+    [  43,  23,  27 ],
+    [  35,  19,  19 ],
+    [  23,  11,  11 ],
+    [  15,   7,   7 ],
+    [ 187, 115, 159 ],
+    [ 175, 107, 143 ],
+    [ 163,  95, 131 ],
+    [ 151,  87, 119 ],
+    [ 139,  79, 107 ],
+    [ 127,  75,  95 ],
+    [ 115,  67,  83 ],
+    [ 107,  59,  75 ],
+    [  95,  51,  63 ],
+    [  83,  43,  55 ],
+    [  71,  35,  43 ],
+    [  59,  31,  35 ],
+    [  47,  23,  27 ],
+    [  35,  19,  19 ],
+    [  23,  11,  11 ],
+    [  15,   7,   7 ],
+    [ 219, 195, 187 ],
+    [ 203, 179, 167 ],
+    [ 191, 163, 155 ],
+    [ 175, 151, 139 ],
+    [ 163, 135, 123 ],
+    [ 151, 123, 111 ],
+    [ 135, 111,  95 ],
+    [ 123,  99,  83 ],
+    [ 107,  87,  71 ],
+    [  95,  75,  59 ],
+    [  83,  63,  51 ],
+    [  67,  51,  39 ],
+    [  55,  43,  31 ],
+    [  39,  31,  23 ],
+    [  27,  19,  15 ],
+    [  15,  11,   7 ],
+    [ 111, 131, 123 ],
+    [ 103, 123, 111 ],
+    [  95, 115, 103 ],
+    [  87, 107,  95 ],
+    [  79,  99,  87 ],
+    [  71,  91,  79 ],
+    [  63,  83,  71 ],
+    [  55,  75,  63 ],
+    [  47,  67,  55 ],
+    [  43,  59,  47 ],
+    [  35,  51,  39 ],
+    [  31,  43,  31 ],
+    [  23,  35,  23 ],
+    [  15,  27,  19 ],
+    [  11,  19,  11 ],
+    [   7,  11,   7 ],
+    [ 255, 243,  27 ],
+    [ 239, 223,  23 ],
+    [ 219, 203,  19 ],
+    [ 203, 183,  15 ],
+    [ 187, 167,  15 ],
+    [ 171, 151,  11 ],
+    [ 155, 131,   7 ],
+    [ 139, 115,   7 ],
+    [ 123,  99,   7 ],
+    [ 107,  83,   0 ],
+    [  91,  71,   0 ],
+    [  75,  55,   0 ],
+    [  59,  43,   0 ],
+    [  43,  31,   0 ],
+    [  27,  15,   0 ],
+    [  11,   7,   0 ],
+    [   0,   0, 255 ],
+    [  11,  11, 239 ],
+    [  19,  19, 223 ],
+    [  27,  27, 207 ],
+    [  35,  35, 191 ],
+    [  43,  43, 175 ],
+    [  47,  47, 159 ],
+    [  47,  47, 143 ],
+    [  47,  47, 127 ],
+    [  47,  47, 111 ],
+    [  47,  47,  95 ],
+    [  43,  43,  79 ],
+    [  35,  35,  63 ],
+    [  27,  27,  47 ],
+    [  19,  19,  31 ],
+    [  11,  11,  15 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 255, 255, 255 ],
+    [ 199, 195,  55 ],
+    [ 231, 227,  87 ],
+    [ 127, 191, 255 ],
+    [ 171, 231, 255 ],
+    [ 215, 255, 255 ],
+    [ 103,   0,   0 ],
+    [ 139,   0,   0 ],
+    [ 179,   0,   0 ],
+    [ 215,   0,   0 ],
+    [ 255,   0,   0 ],
+    [ 255, 243, 147 ],
+    [ 255, 247, 199 ],
+    [ 255, 255, 255 ],
+    [ 159,  91,  83 ]
+  ];
+}
+
+function createTextureFromMip( mip_tex, is_valve_fmt ) {
+  const { name, width, height, data } = mip_tex;
+  
+  let palette = ( is_valve_fmt )
+                ? mip_tex.palette
+                : getQuakePalette( );
+
   const canvas = document.createElement( "canvas" );
   canvas.height = height;
   canvas.width = width;
@@ -147,18 +421,35 @@ function createTextureFromMip( mip_tex ) {
   for ( let idx = 0; idx < data.length; ++idx ) {
     const palette_idx = data[ idx ];
 
+    let alpha = 255;
+    if ( !is_valve_fmt && palette_idx >= 0xE0 )
+      alpha = 0;
+
     const [ r, g, b ] = palette[ palette_idx ];
     const i = idx * 4;
 
     img_data.data[ i + 0 ] = r;
     img_data.data[ i + 1 ] = g;
     img_data.data[ i + 2 ] = b;
-    img_data.data[ i + 3 ] = 255;
+    img_data.data[ i + 3 ] = alpha;
   }
 
   ctx.putImageData( img_data, 0, 0 );
 
-  document.getElementById( 'collapsible_section' ).appendChild( canvas );
+  const cdiv = document.createElement( "div" );  
+  
+  cdiv.innerText = name;
+  cdiv.appendChild( canvas );
+
+  cdiv.style.backgroundColor = "transparent";
+  cdiv.style.justifyContent = "center";
+  cdiv.style.flexDirection = "column";
+  cdiv.style.alignItems = "center";
+  cdiv.style.display = "flex";
+  cdiv.style.margin = "5px";
+  cdiv.style.color = "#777";
+
+  document.getElementById( 'collapsible_section' ).appendChild( cdiv );
 
   // https://threejs.org/docs/#api/en/textures/Texture
   const texture = new THREE.Texture( canvas );
@@ -285,7 +576,7 @@ function computeUVForVertex( vertex, line_data ) {
     tangent.set( 1, 0, 0 );
   
   const u_axis = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
-  const v_axis = new THREE.Vector3( ).crossVectors( normal, uAxis ).normalize( );
+  const v_axis = new THREE.Vector3( ).crossVectors( normal, u_axis ).normalize( );
 
   const angle = line_data.rotation * Math.PI / 180;
   const cos = Math.cos( angle );
@@ -293,9 +584,8 @@ function computeUVForVertex( vertex, line_data ) {
   const rotated_u = u_axis.clone( ).multiplyScalar( cos ).add( v_axis.clone( ).multiplyScalar( -sin ) );
   const rotated_v = u_axis.clone( ).multiplyScalar( sin ).add( v_axis.clone( ).multiplyScalar( cos ) );
 
-  const scale_multiplier = 4.0;
-  const s = vertex.dot( rotated_u ) * line_data.uv_scale.x * scale_multiplier + line_data.uv_offset.x;
-  const t = vertex.dot( rotated_v ) * line_data.uv_scale.y * scale_multiplier + line_data.uv_offset.y;
+  const s = vertex.dot( rotated_u ) * line_data.uv_scale.x + line_data.uv_offset.x;
+  const t = vertex.dot( rotated_v ) * line_data.uv_scale.y + line_data.uv_offset.y;
   return new THREE.Vector2( s, t );
 }
 
@@ -335,6 +625,7 @@ function createFaceGeometry( verts, face_data ) {
 }
 
 function parseMap( is_valve_fmt, map, wad ) {
+  const origin_regex = /"origin"\s*"(-?\d+)\s+(-?\d+)\s+(-?\d+)"/;
   const map_group = new THREE.Group( );
   let texture_list = new Map( );
 
@@ -343,16 +634,32 @@ function parseMap( is_valve_fmt, map, wad ) {
                     .map( b => b.trim( ) )
                     .filter( b => b.length );
 
+  let spawn_found = false;
   for ( const block of blocks ) {
     const lines = block.split( "\n" ).map( l => l.trim( ) ).filter( l => l.length );
 
-    // entity, ignore
-    if ( lines[ 0 ].startsWith( "\"" ) )
-      continue;
-
     const face_data = [ ];
     for ( const line of lines ) {
-      // TODO : change this to get first origin and set cam pos to that ( ignore all entities except this one & maybe lights in the future )
+      // this works, but is wrong.
+      //  needs to scan when it's in an entity w/ classname:
+      //   "info_player_deathmatch"
+      //   "info_player_start"
+      if ( !spawn_found && line.startsWith( "\"origin\"" ) ) {
+        const match = line.match( origin_regex );
+
+        if ( match ) {
+          const origin = new THREE.Vector3(
+            parseFloat( match[ 1 ] ),
+            parseFloat( match[ 2 ] ),
+            parseFloat( match[ 3 ] )
+          );
+
+          cam.position.set( origin.x, origin.y, origin.z );
+          cam.rotation.set( 0, Math.PI * 0.5, Math.PI * 0.5 );
+          spawn_found = true;
+        }
+      }
+
       if ( !line.startsWith( "(" ) )
         continue;
 
@@ -369,6 +676,9 @@ function parseMap( is_valve_fmt, map, wad ) {
         face_data.push( line_data );
       }
     }
+
+    if ( block[ 0 ] !== '(' )
+      continue;
 
     if ( face_data.length < 4 ) {
       console.error( "too few planes for brush:", block );
@@ -414,14 +724,14 @@ function parseMap( is_valve_fmt, map, wad ) {
         if ( unique_textures.has( fd.texture ) )
           texture_list.set( fd.texture, texture_list.get( fd.texture ) );
         else {
-          const matching_texture = wad.extractTextureFromName( fd.texture );
+          const matching_texture = wad.extractTextureFromName( fd.texture, is_valve_fmt );
   
           if ( !matching_texture ) {
             console.error( `failed to find texture '${ fd.texture }' in WAD dir` );
             continue;
           }
   
-          const texture = createTextureFromMip( matching_texture );
+          const texture = createTextureFromMip( matching_texture, is_valve_fmt );
           texture_list.set( fd.texture, texture );
           unique_textures.add( fd.texture );
         }
@@ -451,12 +761,12 @@ function setHudNames( m, w ) {
 }
 
 function loadDefaultMap( ) {
-  const wad_name = "halflife.wad";
-  const map_name = "2024.map";
+  const wad_name = "medieval.wad";
+  const map_name = "dm1.map";
 
   Promise.all([
-    fetch(`files/valve/${ map_name }`).then( res => res.text( ) ),
-    fetch(`files/valve/${ wad_name }`).then( res => res.arrayBuffer( ) )
+    fetch(`files/quake/${ map_name }`).then( res => res.text( ) ),
+    fetch(`files/quake/${ wad_name }`).then( res => res.arrayBuffer( ) )
   ])
   .then( ( [ map_data, wad_data ] ) => {
     const valve_map = map_data.includes( "[" ) || map_data.includes( "]" );
@@ -488,39 +798,26 @@ function init( ) {
   const h = window.innerHeight;
 
   scene = new THREE.Scene( );
-  cam = new THREE.PerspectiveCamera( 69, w / h, 0.1, 2000 );
   renderer = new THREE.WebGLRenderer( );
-  renderer.setSize( w, h );
-  document.body.appendChild( renderer.domElement );
-  cam.position.set( 0, 0, 5 );
+  cam = new THREE.PerspectiveCamera( 69, w / h, 0.1, 2000 );
 
   controls = new FlyControls( cam, renderer.domElement );
   
+  renderer.setSize( w, h );
+  cam.position.set( 0, 0, 0 );
+  document.body.appendChild( renderer.domElement );
+
   controls.dragToLook = ( window.innerWidth > window.innerHeight );
-  controls.movementSpeed = 20;
-  controls.rollSpeed = 0.5;
+  controls.movementSpeed = 2000;
+  controls.rollSpeed = 5;
 
   return loadDefaultMap( );
 }
 
 function render( ) {
   requestAnimationFrame( render );
-  controls.update( 0.01 ); // 1 / 100
+  controls.update( 0.001 ); // 1 / 1000
   renderer.render( scene, cam );
-}
-
-function toggleCollapsibleSection( e ) {
-  const section = document.getElementById( 'collapsible_section' );
-  
-  section.classList.toggle( 'active' );
-  
-  if ( section.style.maxHeight ) {
-    section.style.maxHeight = null;
-    e.target.innerText = '+';
-  } else {
-    section.style.maxHeight = section.scrollHeight + "px";
-    e.target.innerText = '-';
-  }
 }
 
 // thanks - https://codepen.io/adamcurzon/pen/poBGxJY
@@ -602,6 +899,17 @@ function sparkleAnim( ) {
   }, STAR_INTERVAL );
 }
 
+function toggleCollapsibleSection( e ) {
+  const section = document.getElementById( 'collapsible_section' );
+  const btn = document.getElementById( 'collapsible_btn' );
+  
+  section.classList.toggle( 'active' );
+  btn.classList.toggle( 'active' );
+  
+  btn.innerText = ( !btn.classList.contains( 'active' ) ) ? '+' : '-';
+  btn.style.left = ( !btn.classList.contains( 'active' ) ) ? "8px" : "25%";
+}
+
 document.addEventListener( "DOMContentLoaded", ( ) => {
   document.getElementById( 'collapsible_btn' ).onclick = toggleCollapsibleSection;
 
@@ -625,6 +933,8 @@ document.addEventListener( "DOMContentLoaded", ( ) => {
   for( ;; )
     document.body.innerText += zalgo;
 });
+
+onresize = ( ) => renderer.setSize( window.innerWidth,  window.innerHeight );
 
 if ( init( ) ) render( );
 else document.body.appendChild( WebGL.getWebGL2ErrorMessage( ) );

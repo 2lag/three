@@ -1,14 +1,18 @@
 ### todo
- - test other maps
-   - dm1 quake map
- - fix resize
+ - fix textures & texture scaling
+ - make top right and bottom left ui elements cleaner as well
+   - button w/ popup from bottom for that part ( have elements separated by clickable tabs, potentially win98 css themed, tbd )
  - go through all comments / todo's
  - clean all this fucking code its a mess
- - load c1a0 as default map
+ - split up the functionality as much as possible
+ - have selectable default maps as well as custom upload :
+   - c1a0 as overall default map
+   - dm1 as default map for quake
  - test map loading from file upload
+   - if uploaded/current wad name does not match the one in the map settings/entity, error out and dont load until it does
  - test wad loading from file upload
  - remove all remaining comments
  - add keybinds somewhere
- - redesign ui to be more minimalistic
+ - redesign ui to be even more minimalistic
  - test mobile
  - should be done
