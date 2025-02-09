@@ -78,7 +78,7 @@ label,
   justify-content: center;
   border: 1px solid #111;
   transition: var( --bottom-slide );
-  background-color: rgba( 0.9, 0.9, 0.9 );
+  background-color: rgba( 0.9, 0.9, 0.9, 0.6 );
 }
 
 #bottom_collapsible_section.active { bottom: 0px }
@@ -101,61 +101,3 @@ label,
 
 #fps > div { position: relative !important; }
 #tagline > a { color: #999; }
-
-/* TAGLINE SPARKLE ONLY BELOW HERE */
-.sparkle {
-  text-shadow: 0px 0px 10px black;
-  position: relative;
-  font-weight: 700;
-  color: #000;
-}
-
-.star {
-  --star-color: #710ff1;
-  --star-size: 50px;
-  --start-left: 0px;
-  --start-top: 0px;  
-  --star-life: 5s;
-  --end-left: 0px;
-  --end-top: 0px;
-  
-  animation: slide var( --star-life ) ease-in forwards;
-  background: var( --star-color );
-  height: var( --star-size );
-  width: var( --star-size );
-  left: var( --end-left );
-  top: var( --end-top );
-  
-  mix-blend-mode: lighten;
-  position: absolute;
-}
-
-.star:after {
-  box-shadow: var( --star-size ) var( --star-size ) var( --back ),
-              var( --star-size ) 0px var( --back ),
-              0px var( --star-size ) var( --back );
-  left: calc( var( --star-size ) / 2 * -1 );
-  top: calc( var( --star-size ) / 2 * -1 );
-  background-color: var( --back );
-  height: var( --star-size );
-  width: var( --star-size );
-  border-radius: 100%;
-  position: relative;
-  display: block;
-  content: "";
-}
-
-@keyframes slide {
-  0%{
-    transform: rotate( 0deg );
-    left: var( --start-left );
-    top: var( --start-top );
-    opacity: 0;
-  }
-  100%{
-    transform: rotate( calc( 180deg * var( --star-life-num ) ) ) scale( 0.5 );
-    left: var( --end-left );
-    top: var( --end-top );
-    opacity: 1;
-  }
-}

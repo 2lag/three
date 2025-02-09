@@ -1,9 +1,8 @@
 ### todo
- - fix quake texture offsets & scaling ( valve is fine i think... *double check* )
  - add wireframe toggle with 'x' keybind AND onscreen button that syncs
+ - fix quake texture offsets & scaling ( valve is fine i think... *double check* )
  - go through all comments / todo's
- - clean all this fucking code its a mess
- - split up the functionality as much as possible
+ - clean all this fucking code its a mess ( split up the functionality as much as possible )
  - have selectable default maps as well as custom upload :
    - c1a0 as overall default map
    - dm1 as default map for quake
@@ -12,6 +11,6 @@
  - test wad loading from file upload
  - remove all remaining comments
  - add keybinds somewhere
- - redesign ui to be even more minimalistic
- - test mobile
+ - redesign ui to be even better
+ - test mobile ( add ass command on kuso.day )
  - should be done

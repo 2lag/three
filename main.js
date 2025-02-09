@@ -772,12 +772,12 @@ function setHudNames( m, w ) {
 }
 
 function loadDefaultMap( ) {
-  const wad_name = "medieval.wad";
-  const map_name = "dm1.map";
+  const wad_name = "halflife.wad";
+  const map_name = "c1a0.map";
 
   Promise.all([
-    fetch(`files/quake/${ map_name }`).then( res => res.text( ) ),
-    fetch(`files/quake/${ wad_name }`).then( res => res.arrayBuffer( ) )
+    fetch(`files/valve/${ map_name }`).then( res => res.text( ) ),
+    fetch(`files/valve/${ wad_name }`).then( res => res.arrayBuffer( ) )
   ])
   .then( ( [ map_data, wad_data ] ) => {
     const valve_map = map_data.includes( "[" ) || map_data.includes( "]" );
@@ -793,7 +793,7 @@ function loadDefaultMap( ) {
   .catch( err => {
     console.error( 'failed to load default map:', err );
   });
-
+  
   return true;
 }
 
@@ -811,103 +811,25 @@ function init( ) {
   scene = new THREE.Scene( );
   renderer = new THREE.WebGLRenderer( );
   cam = new THREE.PerspectiveCamera( 69, w / h, 0.1, 2000 );
-
+  
   controls = new FlyControls( cam, renderer.domElement );
   
-  renderer.setSize( w, h );
   cam.position.set( 0, 0, 0 );
+  renderer.setSize( w, h );
+  
   document.body.appendChild( renderer.domElement );
-
-  controls.dragToLook = ( window.innerWidth > window.innerHeight );
-  controls.movementSpeed = 2000;
-  controls.rollSpeed = 5;
+  
+  controls.dragToLook = ( w > h );
+  controls.movementSpeed = 500;
+  controls.rollSpeed = 1;
 
   return loadDefaultMap( );
 }
 
 function render( ) {
   requestAnimationFrame( render );
-  controls.update( 0.001 ); // 1 / 1000
+  controls.update( 0.01 ); // 1 / 100
   renderer.render( scene, cam );
-}
-
-// thanks - https://codepen.io/adamcurzon/pen/poBGxJY
-function sparkleAnim( ) {
-  const sparkle = document.querySelector( ".sparkle" );
-  const MIN_STAR_TRAVEL_X = 50;
-  const MIN_STAR_TRAVEL_Y = 50;
-  const STAR_INTERVAL = 32;
-  const MAX_STAR_SIZE = 36;
-  const MIN_STAR_SIZE = 18;
-  const MAX_STAR_LIFE = 3;
-  const MIN_STAR_LIFE = 1;
-  const MAX_STARS = 5;
-
-  var current_star_count = 0;
-  
-  const Star = class {
-    constructor( ) {
-      this.size = this.random( MAX_STAR_SIZE, MIN_STAR_SIZE );
-      
-      this.x = this.random(
-        sparkle.offsetWidth * 0.75,
-        sparkle.offsetWidth * 0.25
-      );
-      this.y = sparkle.offsetHeight / 2 - this.size / 2;
-      
-      this.x_dir = this.randomMinus( );
-      this.y_dir = this.randomMinus( );
-
-      this.x_max_travel =
-        this.x_dir === -1
-        ? this.x
-        : sparkle.offsetWidth - this.x - this.size;
-
-      this.y_max_travel = sparkle.offsetHeight / 2 - this.size;
-
-      this.x_travel_dist = this.random( this.x_max_travel, MIN_STAR_TRAVEL_X );
-      this.y_travel_dist = this.random( this.y_max_travel, MIN_STAR_TRAVEL_Y );
-      
-      this.x_end = this.x + this.x_travel_dist * this.x_dir;
-      this.y_end = this.y + this.y_travel_dist * this.y_dir;
-      
-      this.life = this.random( MAX_STAR_LIFE, MIN_STAR_LIFE );
-
-      this.star = document.createElement( "div" );
-
-      this.star.classList.add( "star" );
-
-      this.star.style.setProperty( "--star-color", this.randomPurpleColor( ) );
-      this.star.style.setProperty( "--star-size", this.size + "px" );
-      this.star.style.setProperty( "--end-left", this.x_end + "px" );
-      this.star.style.setProperty( "--end-top", this.y_end + "px" );
-      this.star.style.setProperty( "--star-life", this.life + "s" );
-      this.star.style.setProperty( "--start-left", this.x + "px" );
-      this.star.style.setProperty( "--start-top", this.y + "px" );
-      this.star.style.setProperty( "--star-life-num", this.life );
-    }
-
-    draw( ) { sparkle.appendChild( this.star ); }
-    pop( ) { sparkle.removeChild( this.star ); }
-    random( max, min ) { return Math.floor( Math.random( ) * ( max - min + 1 ) ) + min; }
-    randomPurpleColor( ) { return "hsla(" + this.random( 290, 270 ) + ", 100%, " + this.random( 70, 40 ) + "%, 1)"; }
-    randomMinus( ) { return Math.random( ) > 0.5 ? 1 : -1; }
-  };
-
-  setInterval( ( ) => {
-    if ( current_star_count >= MAX_STARS )
-      return;
-
-    ++current_star_count;
-
-    var newStar = new Star( );
-    newStar.draw( );
-
-    setTimeout( ( ) => {
-      --current_star_count;
-      newStar.pop( );
-    }, newStar.life * 1000 );
-  }, STAR_INTERVAL );
 }
 
 function toggleSideCollapsibleSection( e ) {
@@ -943,21 +865,6 @@ document.addEventListener( "DOMContentLoaded", ( ) => {
   document.getElementById( 'side_collapsible_btn' ).onclick = toggleSideCollapsibleSection;
 
   // add upload map and wad events to parse shi
-
-  var tagline = document.getElementById( 'tagline' );
-
-  if ( tagline ) {
-    sparkleAnim( );
-    return;
-  }
-  
-  var zalgo = "w̵̧̲̞̙̥̺̝̥̤͉̟͔͇̤̬̜͒̈̔̃̿͊͊̿̆̚ͅh̵̢͖̠͐̄̆̓̓̏́̆̈́͆͂͘̕͝ā̶̢̛̫͍̮̥̤̜̣͕͚̳̝̣̺͇̣̂̎̐̿̀́̀̓t̸̤͚͊̄̀͆̈́͑̈́̈́̔̍̎̈́̍͝ ̶̱͈͊̈̂̂t̴͚̠͖̞͎̘̳̄̀͌̏ḩ̴̢̣̝̗̘̻̤͗̈ĕ̷̗̩̱̘͈̯̤̽͛̓̍̋̆̄̈́̑̈́́́̑͛͠͝ ̴̡̡͇̖͓̜̦̫̹̭͙̯̤̍̈͋̏͌̐͗̑̎̐́̒̈́ͅf̷̧͕͖͉͍͕̺̳͚̤̤̥͗́͜u̴̢̢͖̦͓̭̩͇͈͍͋͂̓̊ͅç̸͉͇͉̟̇͂̀̔̈́͋̈́̉̒͆̏́͑̍̕͝͝k̵̨̡̡̝͙̠̓́̍́̅͊̂̒͘̕͘";
-
-  while ( document.body.children[ 0 ] )
-    document.body.children[ 0 ].remove( );
-
-  for( ;; )
-    document.body.innerText += zalgo;
 });
 
 onresize = ( ) => {
@@ -965,7 +872,9 @@ onresize = ( ) => {
   const w = window.innerWidth;
 
   renderer.setSize( w,  h );
-  //cam.aspect = w / h;
+  cam.aspect = w / h;
+
+  cam.updateProjectionMatrix( );
 };
 
 if ( init( ) ) render( );
