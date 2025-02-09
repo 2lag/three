@@ -14,7 +14,11 @@
     </script>
   </head>
   <body>
-    <div id="settings">
+    <div id="side_collapsible_section"></div>
+    <button type="button" id="side_collapsible_btn">+</button>
+
+    <button type="button" id="bottom_collapsible_btn">+</button>
+    <div id="bottom_collapsible_section">
       <input type="file" id="map" accept=".map" name="mapfilename" hidden>
       <input type="file" id="wad" accept=".wad" name="wadfilename" hidden>
 
@@ -27,16 +31,13 @@
         <label for="wad">Choose WAD</label>
         <span id="wad_name"> </span>
       </div>
-    </div>
 
-    <div id="collapsible_section"></div>
-    <button type="button" id="collapsible_btn">+</button>
-
-    <div id="info">
-      <div id="fps"></div>
-      <span id="tagline">made by <a href="https://kuso.day" target="_blank" class="sparkle">day</a></span>
+      <div id="fps">
+        
+        <span id="tagline">made by <a href="https://kuso.day" target="_blank" class="sparkle">day</a></span>
+      </div>
     </div>
   </body>
-  <script>javascript:(function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.body.appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='https://mrdoob.github.io/stats.js/build/stats.min.js';document.head.appendChild(script);})()</script>
+  <script>javascript:(function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.getElementById('fps').prepend(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='https://mrdoob.github.io/stats.js/build/stats.min.js';document.head.appendChild(script);})()</script>
   <script type="module" src="main.js"></script>
 </html>

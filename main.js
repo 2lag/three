@@ -403,7 +403,7 @@ function getQuakePalette( ) {
   ];
 }
 
-function createTextureFromMip( mip_tex, is_valve_fmt ) {
+function createTextureFromMip( mip_tex, face_data, is_valve_fmt ) {
   const { name, width, height, data } = mip_tex;
   
   let palette = ( is_valve_fmt )
@@ -449,15 +449,26 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   cdiv.style.margin = "5px";
   cdiv.style.color = "#777";
 
-  document.getElementById( 'collapsible_section' ).appendChild( cdiv );
+  document.getElementById( 'side_collapsible_section' ).appendChild( cdiv );
 
   // https://threejs.org/docs/#api/en/textures/Texture
   const texture = new THREE.Texture( canvas );
+  
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
+  texture.rotation = face_data.rotation;
+
+  //texture.wrapS = THREE.ClampToEdgeWrapping;
+  //texture.wrapT = THREE.ClampToEdgeWrapping;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set( 0.01, 0.01 );
+
+  if ( is_valve_fmt )
+    texture.offset.set( face_data.u.w, face_data.v.w );
+  else
+    texture.offset.set( face_data.uv_offset.x, face_data.uv_offset.y );
+
+  texture.repeat.set( face_data.uv_scale.x * 0.01, face_data.uv_scale.y * 0.01 );
   texture.needsUpdate = true;
   return texture;
 }
@@ -494,8 +505,8 @@ function parseValveMapLine( line ) {
     v1: new THREE.Vector3( Number( match[ 4 ] ), Number( match[ 5 ] ), Number( match[ 6 ] ) ),
     v2: new THREE.Vector3( Number( match[ 7 ] ), Number( match[ 8 ] ), Number( match[ 9 ] ) ),
     texture: match[ 10 ],
-    u: new THREE.Vector4( Number( match[ 11 ] ), Number( match[ 12 ] ), Number( match[ 13 ] ), Number( match[ 14 ] ) ),
-    v: new THREE.Vector4( Number( match[ 15 ] ), Number( match[ 16 ] ), Number( match[ 17 ] ), Number( match[ 18 ] ) ),
+    u: new THREE.Vector4( Number( match[ 11 ] ), Number( match[ 12 ] ), Number( match[ 13 ] ), Number( match[ 14 ] ) ), // Ux Uy Uz Uoffset
+    v: new THREE.Vector4( Number( match[ 15 ] ), Number( match[ 16 ] ), Number( match[ 17 ] ), Number( match[ 18 ] ) ), // Vx Vy Vz Voffset
     rotation: Number( match[ 19 ] ),
     uv_scale: new THREE.Vector2( Number( match[ 20 ] ), Number( match[ 21 ] ) )
   };
@@ -564,8 +575,8 @@ function getFacePolygon( plane, verts ) {
 
 function computeUVForVertex( vertex, line_data ) {
   if ( line_data.type === "VALVE" ) {
-    const s = vertex.dot( new THREE.Vector3( line_data.u.x, line_data.u.y, line_data.u.z ) ) + line_data.u.w;
-    const t = vertex.dot( new THREE.Vector3( line_data.v.x, line_data.v.y, line_data.v.z ) ) + line_data.v.w;
+    const s = vertex.dot( new THREE.Vector3( line_data.u.x, line_data.u.y, line_data.u.z ) );
+    const t = vertex.dot( new THREE.Vector3( line_data.v.x, line_data.v.y, line_data.v.z ) );
     return new THREE.Vector2( s, t );
   }
   
@@ -582,7 +593,7 @@ function computeUVForVertex( vertex, line_data ) {
   const cos = Math.cos( angle );
   const sin = Math.sin( angle );
   const rotated_u = u_axis.clone( ).multiplyScalar( cos ).add( v_axis.clone( ).multiplyScalar( -sin ) );
-  const rotated_v = u_axis.clone( ).multiplyScalar( sin ).add( v_axis.clone( ).multiplyScalar( cos ) );
+  const rotated_v = u_axis.clone( ).multiplyScalar( sin ).add( v_axis.clone( ).multiplyScalar(  cos ) );
 
   const s = vertex.dot( rotated_u ) * line_data.uv_scale.x + line_data.uv_offset.x;
   const t = vertex.dot( rotated_v ) * line_data.uv_scale.y + line_data.uv_offset.y;
@@ -731,7 +742,7 @@ function parseMap( is_valve_fmt, map, wad ) {
             continue;
           }
   
-          const texture = createTextureFromMip( matching_texture, is_valve_fmt );
+          const texture = createTextureFromMip( matching_texture, fd, is_valve_fmt );
           texture_list.set( fd.texture, texture );
           unique_textures.add( fd.texture );
         }
@@ -899,9 +910,9 @@ function sparkleAnim( ) {
   }, STAR_INTERVAL );
 }
 
-function toggleCollapsibleSection( e ) {
-  const section = document.getElementById( 'collapsible_section' );
-  const btn = document.getElementById( 'collapsible_btn' );
+function toggleSideCollapsibleSection( e ) {
+  const section = document.getElementById( 'side_collapsible_section' );
+  const btn = document.getElementById( 'side_collapsible_btn' );
   
   section.classList.toggle( 'active' );
   btn.classList.toggle( 'active' );
@@ -910,11 +921,26 @@ function toggleCollapsibleSection( e ) {
   btn.style.left = ( !btn.classList.contains( 'active' ) ) ? "8px" : "25%";
 }
 
-document.addEventListener( "DOMContentLoaded", ( ) => {
-  document.getElementById( 'collapsible_btn' ).onclick = toggleCollapsibleSection;
+function toggleBottomCollapsibleSection( e ) {
+  const side_section = document.getElementById( 'side_collapsible_section' );
+  const section = document.getElementById( 'bottom_collapsible_section' );
+  const btn = document.getElementById( 'bottom_collapsible_btn' );
+  
+  section.classList.toggle( 'active' );
+  btn.classList.toggle( 'active' );
+  
+  if ( section.classList.contains( 'active' ) )
+    side_section.style.height = "calc( 100% - 132px )";
+  else
+    side_section.style.height = "100%";
 
-  // change to : while fps has no children, try to move the fkn div ( seems to break sometimes )
-  document.getElementById( 'fps' ).appendChild( document.getElementsByTagName( 'div' )[ 6 ] );
+  btn.innerText = ( !btn.classList.contains( 'active' ) ) ? '+' : '-';
+  btn.style.bottom = ( !btn.classList.contains( 'active' ) ) ? "8px" : "136px";
+}
+
+document.addEventListener( "DOMContentLoaded", ( ) => {
+  document.getElementById( 'bottom_collapsible_btn' ).onclick = toggleBottomCollapsibleSection;
+  document.getElementById( 'side_collapsible_btn' ).onclick = toggleSideCollapsibleSection;
 
   // add upload map and wad events to parse shi
 
@@ -934,7 +960,13 @@ document.addEventListener( "DOMContentLoaded", ( ) => {
     document.body.innerText += zalgo;
 });
 
-onresize = ( ) => renderer.setSize( window.innerWidth,  window.innerHeight );
+onresize = ( ) => {
+  const h = window.innerHeight;
+  const w = window.innerWidth;
+
+  renderer.setSize( w,  h );
+  //cam.aspect = w / h;
+};
 
 if ( init( ) ) render( );
 else document.body.appendChild( WebGL.getWebGL2ErrorMessage( ) );

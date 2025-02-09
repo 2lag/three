@@ -1,7 +1,6 @@
 ### todo
- - fix textures & texture scaling
- - make top right and bottom left ui elements cleaner as well
-   - button w/ popup from bottom for that part ( have elements separated by clickable tabs, potentially win98 css themed, tbd )
+ - fix quake texture offsets & scaling ( valve is fine i think... *double check* )
+ - add wireframe toggle with 'x' keybind AND onscreen button that syncs
  - go through all comments / todo's
  - clean all this fucking code its a mess
  - split up the functionality as much as possible
