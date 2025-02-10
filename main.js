@@ -4,6 +4,8 @@ import WebGL from 'three/addons/capabilities/WebGL.js';
 
 import { FlyControls } from 'three/addons/controls/FlyControls.js';
 
+const FLT_EPSILON = 1e-6;
+
 class WadParser {
   constructor( array_buffer ) {
     this.data = new DataView( array_buffer );
@@ -22,9 +24,6 @@ class WadParser {
   }
 
   readInt32( ) {
-    if ( this.offset >= this.data.byteLength )
-      throw new Error( `WAD OOB [ ${ this.offset } / ${ this.data.byteLength } ]` );
-
     let value = this.data.getInt32( this.offset, true );
     this.offset += 4;
     return value;
@@ -33,12 +32,11 @@ class WadParser {
   parseHeader( ) {
     this.offset = 0;
     this.header.magic = this.readString( 4 );
+    this.header.num_dirs = this.readInt32( );
+    this.header.dir_offset = this.readInt32( );
 
     if ( this.header.magic !== "WAD3" && this.header.magic !== "WAD2" )
       throw new Error( `invalid WAD file: ${ this.header.magic }` );
-
-    this.header.num_dirs = this.readInt32( );
-    this.header.dir_offset = this.readInt32( );
   }
 
   parseDirectory( ) {
@@ -51,11 +49,9 @@ class WadParser {
         size: this.readInt32( ),
         type: this.data.getUint8( this.offset++ ),
         compressed: this.data.getUint8( this.offset++ ),
-        padding: this.data.getUint16( this.offset, true )
+        padding: this.data.getUint16( this.offset += 2, true ),
+        name: this.readString( 16 )
       };
-
-      this.offset += 2;
-      entry.name = this.readString( 16 );
 
       this.directory.push( entry );
     }
@@ -71,18 +67,18 @@ class WadParser {
     const offset = this.readInt32( );
 
     this.offset = entry.offset + offset;
-    let size = width * height;
 
+    let size = width * height;
     let data = new Uint8Array( size );
+
     for ( let d_idx = 0; d_idx < size; ++d_idx )
       data[ d_idx ] = this.data.getUint8( this.offset++ );
 
-    if ( is_valve_fmt ) {
-      const palette = extractPalette( this.data, base, width, height );
-      return { name, width, height, data, palette };
-    }
+    if ( !is_valve_fmt )
+      return { name, width, height, data };
 
-    return { name, width, height, data };
+    const palette = extractPalette( this.data, base, width, height );
+    return { name, width, height, data, palette };
   }
 
   extractTextureFromName( name, is_valve_fmt ) {
@@ -130,8 +126,7 @@ function extractPalette( data_view, base_offset, w, h ) {
                        mip2_sz + mip3_sz + 2;
 
   const palette = new Array( 256 );
-
-  for ( let idx = 0; idx < 256; ++idx ) {
+  for ( let idx = 0; idx < palette.length; ++idx ) {
     const r = data_view.getUint8( palette_offset++ );
     const g = data_view.getUint8( palette_offset++ );
     const b = data_view.getUint8( palette_offset++ );
@@ -144,333 +139,39 @@ function extractPalette( data_view, base_offset, w, h ) {
 
 function getQuakePalette( ) {
   return [
-    [   0,   0,   0 ],
-    [  15,  15,  15 ],
-    [  31,  31,  31 ],
-    [  47,  47,  47 ],
-    [  63,  63,  63 ],
-    [  75,  75,  75 ],
-    [  91,  91,  91 ],
-    [ 107, 107, 107 ],
-    [ 123, 123, 123 ],
-    [ 139, 139, 139 ],
-    [ 155, 155, 155 ],
-    [ 171, 171, 171 ],
-    [ 187, 187, 187 ],
-    [ 203, 203, 203 ],
-    [ 219, 219, 219 ],
-    [ 235, 235, 235 ],
-    [  15,  11,   7 ],
-    [  23,  15,  11 ],
-    [  31,  23,  11 ],
-    [  39,  27,  15 ],
-    [  47,  35,  19 ],
-    [  55,  43,  23 ],
-    [  63,  47,  23 ],
-    [  75,  55,  27 ],
-    [  83,  59,  27 ],
-    [  91,  67,  31 ],
-    [  99,  75,  31 ],
-    [ 107,  83,  31 ],
-    [ 115,  87,  31 ],
-    [ 123,  95,  35 ],
-    [ 131, 103,  35 ],
-    [ 143, 111,  35 ],
-    [  11,  11,  15 ],
-    [  19,  19,  27 ],
-    [  27,  27,  39 ],
-    [  39,  39,  51 ],
-    [  47,  47,  63 ],
-    [  55,  55,  75 ],
-    [  63,  63,  87 ],
-    [  71,  71, 103 ],
-    [  79,  79, 115 ],
-    [  91,  91, 127 ],
-    [  99,  99, 139 ],
-    [ 107, 107, 151 ],
-    [ 115, 115, 163 ],
-    [ 123, 123, 175 ],
-    [ 131, 131, 187 ],
-    [ 139, 139, 203 ],
-    [   0,   0,   0 ],
-    [   7,   7,   0 ],
-    [  11,  11,   0 ],
-    [  19,  19,   0 ],
-    [  27,  27,   0 ],
-    [  35,  35,   0 ],
-    [  43,  43,   7 ],
-    [  47,  47,   7 ],
-    [  55,  55,   7 ],
-    [  63,  63,   7 ],
-    [  71,  71,   7 ],
-    [  75,  75,  11 ],
-    [  83,  83,  11 ],
-    [  91,  91,  11 ],
-    [  99,  99,  11 ],
-    [ 107, 107,  15 ],
-    [   7,   0,   0 ],
-    [  15,   0,   0 ],
-    [  23,   0,   0 ],
-    [  31,   0,   0 ],
-    [  39,   0,   0 ],
-    [  47,   0,   0 ],
-    [  55,   0,   0 ],
-    [  63,   0,   0 ],
-    [  71,   0,   0 ],
-    [  79,   0,   0 ],
-    [  87,   0,   0 ],
-    [  95,   0,   0 ],
-    [ 103,   0,   0 ],
-    [ 111,   0,   0 ],
-    [ 119,   0,   0 ],
-    [ 127,   0,   0 ],
-    [  19,  19,   0 ],
-    [  27,  27,   0 ],
-    [  35,  35,   0 ],
-    [  47,  43,   0 ],
-    [  55,  47,   0 ],
-    [  67,  55,   0 ],
-    [  75,  59,   7 ],
-    [  87,  67,   7 ],
-    [  95,  71,   7 ],
-    [ 107,  75,  11 ],
-    [ 119,  83,  15 ],
-    [ 131,  87,  19 ],
-    [ 139,  91,  19 ],
-    [ 151,  95,  27 ],
-    [ 163,  99,  31 ],
-    [ 175, 103,  35 ],
-    [  35,  19,   7 ],
-    [  47,  23,  11 ],
-    [  59,  31,  15 ],
-    [  75,  35,  19 ],
-    [  87,  43,  23 ],
-    [  99,  47,  31 ],
-    [ 115,  55,  35 ],
-    [ 127,  59,  43 ],
-    [ 143,  67,  51 ],
-    [ 159,  79,  51 ],
-    [ 175,  99,  47 ],
-    [ 191, 119,  47 ],
-    [ 207, 143,  43 ],
-    [ 223, 171,  39 ],
-    [ 239, 203,  31 ],
-    [ 255, 243,  27 ],
-    [  11,   7,   0 ],
-    [  27,  19,   0 ],
-    [  43,  35,  15 ],
-    [  55,  43,  19 ],
-    [  71,  51,  27 ],
-    [  83,  55,  35 ],
-    [  99,  63,  43 ],
-    [ 111,  71,  51 ],
-    [ 127,  83,  63 ],
-    [ 139,  95,  71 ],
-    [ 155, 107,  83 ],
-    [ 167, 123,  95 ],
-    [ 183, 135, 107 ],
-    [ 195, 147, 123 ],
-    [ 211, 163, 139 ],
-    [ 227, 179, 151 ],
-    [ 171, 139, 163 ],
-    [ 159, 127, 151 ],
-    [ 147, 115, 135 ],
-    [ 139, 103, 123 ],
-    [ 127,  91, 111 ],
-    [ 119,  83,  99 ],
-    [ 107,  75,  87 ],
-    [  95,  63,  75 ],
-    [  87,  55,  67 ],
-    [  75,  47,  55 ],
-    [  67,  39,  47 ],
-    [  55,  31,  35 ],
-    [  43,  23,  27 ],
-    [  35,  19,  19 ],
-    [  23,  11,  11 ],
-    [  15,   7,   7 ],
-    [ 187, 115, 159 ],
-    [ 175, 107, 143 ],
-    [ 163,  95, 131 ],
-    [ 151,  87, 119 ],
-    [ 139,  79, 107 ],
-    [ 127,  75,  95 ],
-    [ 115,  67,  83 ],
-    [ 107,  59,  75 ],
-    [  95,  51,  63 ],
-    [  83,  43,  55 ],
-    [  71,  35,  43 ],
-    [  59,  31,  35 ],
-    [  47,  23,  27 ],
-    [  35,  19,  19 ],
-    [  23,  11,  11 ],
-    [  15,   7,   7 ],
-    [ 219, 195, 187 ],
-    [ 203, 179, 167 ],
-    [ 191, 163, 155 ],
-    [ 175, 151, 139 ],
-    [ 163, 135, 123 ],
-    [ 151, 123, 111 ],
-    [ 135, 111,  95 ],
-    [ 123,  99,  83 ],
-    [ 107,  87,  71 ],
-    [  95,  75,  59 ],
-    [  83,  63,  51 ],
-    [  67,  51,  39 ],
-    [  55,  43,  31 ],
-    [  39,  31,  23 ],
-    [  27,  19,  15 ],
-    [  15,  11,   7 ],
-    [ 111, 131, 123 ],
-    [ 103, 123, 111 ],
-    [  95, 115, 103 ],
-    [  87, 107,  95 ],
-    [  79,  99,  87 ],
-    [  71,  91,  79 ],
-    [  63,  83,  71 ],
-    [  55,  75,  63 ],
-    [  47,  67,  55 ],
-    [  43,  59,  47 ],
-    [  35,  51,  39 ],
-    [  31,  43,  31 ],
-    [  23,  35,  23 ],
-    [  15,  27,  19 ],
-    [  11,  19,  11 ],
-    [   7,  11,   7 ],
-    [ 255, 243,  27 ],
-    [ 239, 223,  23 ],
-    [ 219, 203,  19 ],
-    [ 203, 183,  15 ],
-    [ 187, 167,  15 ],
-    [ 171, 151,  11 ],
-    [ 155, 131,   7 ],
-    [ 139, 115,   7 ],
-    [ 123,  99,   7 ],
-    [ 107,  83,   0 ],
-    [  91,  71,   0 ],
-    [  75,  55,   0 ],
-    [  59,  43,   0 ],
-    [  43,  31,   0 ],
-    [  27,  15,   0 ],
-    [  11,   7,   0 ],
-    [   0,   0, 255 ],
-    [  11,  11, 239 ],
-    [  19,  19, 223 ],
-    [  27,  27, 207 ],
-    [  35,  35, 191 ],
-    [  43,  43, 175 ],
-    [  47,  47, 159 ],
-    [  47,  47, 143 ],
-    [  47,  47, 127 ],
-    [  47,  47, 111 ],
-    [  47,  47,  95 ],
-    [  43,  43,  79 ],
-    [  35,  35,  63 ],
-    [  27,  27,  47 ],
-    [  19,  19,  31 ],
-    [  11,  11,  15 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 255, 255, 255 ],
-    [ 199, 195,  55 ],
-    [ 231, 227,  87 ],
-    [ 127, 191, 255 ],
-    [ 171, 231, 255 ],
-    [ 215, 255, 255 ],
-    [ 103,   0,   0 ],
-    [ 139,   0,   0 ],
-    [ 179,   0,   0 ],
-    [ 215,   0,   0 ],
-    [ 255,   0,   0 ],
-    [ 255, 243, 147 ],
-    [ 255, 247, 199 ],
-    [ 255, 255, 255 ],
-    [ 159,  91,  83 ]
+    // grayscale
+    [   0,   0,   0 ], [  15,  15,  15 ], [  31,  31,  31 ], [  47,  47,  47 ], [  63,  63,  63 ], [  75,  75,  75 ], [  91,  91,  91 ], [ 107, 107, 107 ], [ 123, 123, 123 ], [ 139, 139, 139 ], [ 155, 155, 155 ], [ 171, 171, 171 ], [ 187, 187, 187 ], [ 203, 203, 203 ], [ 219, 219, 219 ], [ 235, 235, 235 ],
+    // brown
+    [  15,  11,   7 ], [  23,  15,  11 ], [  31,  23,  11 ], [  39,  27,  15 ], [  47,  35,  19 ], [  55,  43,  23 ], [  63,  47,  23 ], [  75,  55,  27 ], [  83,  59,  27 ], [  91,  67,  31 ], [  99,  75,  31 ], [ 107,  83,  31 ], [ 115,  87,  31 ], [ 123,  95,  35 ], [ 131, 103,  35 ], [ 143, 111,  35 ],
+    // light blue
+    [  11,  11,  15 ], [  19,  19,  27 ], [  27,  27,  39 ], [  39,  39,  51 ], [  47,  47,  63 ], [  55,  55,  75 ], [  63,  63,  87 ], [  71,  71, 103 ], [  79,  79, 115 ], [  91,  91, 127 ], [  99,  99, 139 ], [ 107, 107, 151 ], [ 115, 115, 163 ], [ 123, 123, 175 ], [ 131, 131, 187 ], [ 139, 139, 203 ],
+    // green
+    [   0,   0,   0 ], [   7,   7,   0 ], [  11,  11,   0 ], [  19,  19,   0 ], [  27,  27,   0 ], [  35,  35,   0 ], [  43,  43,   7 ], [  47,  47,   7 ], [  55,  55,   7 ], [  63,  63,   7 ], [  71,  71,   7 ], [  75,  75,  11 ], [  83,  83,  11 ], [  91,  91,  11 ], [  99,  99,  11 ], [ 107, 107,  15 ],
+    // red
+    [   7,   0,   0 ], [  15,   0,   0 ], [  23,   0,   0 ], [  31,   0,   0 ], [  39,   0,   0 ], [  47,   0,   0 ], [  55,   0,   0 ], [  63,   0,   0 ], [  71,   0,   0 ], [  79,   0,   0 ], [  87,   0,   0 ], [  95,   0,   0 ], [ 103,   0,   0 ], [ 111,   0,   0 ], [ 119,   0,   0 ], [ 127,   0,   0 ],
+    // orange
+    [  19,  19,   0 ], [  27,  27,   0 ], [  35,  35,   0 ], [  47,  43,   0 ], [  55,  47,   0 ], [  67,  55,   0 ], [  75,  59,   7 ], [  87,  67,   7 ], [  95,  71,   7 ], [ 107,  75,  11 ], [ 119,  83,  15 ], [ 131,  87,  19 ], [ 139,  91,  19 ], [ 151,  95,  27 ], [ 163,  99,  31 ], [ 175, 103,  35 ],
+    // gold
+    [  35,  19,   7 ], [  47,  23,  11 ], [  59,  31,  15 ], [  75,  35,  19 ], [  87,  43,  23 ], [  99,  47,  31 ], [ 115,  55,  35 ], [ 127,  59,  43 ], [ 143,  67,  51 ], [ 159,  79,  51 ], [ 175,  99,  47 ], [ 191, 119,  47 ], [ 207, 143,  43 ], [ 223, 171,  39 ], [ 239, 203,  31 ], [ 255, 243,  27 ],
+    // peach
+    [  11,   7,   0 ], [  27,  19,   0 ], [  43,  35,  15 ], [  55,  43,  19 ], [  71,  51,  27 ], [  83,  55,  35 ], [  99,  63,  43 ], [ 111,  71,  51 ], [ 127,  83,  63 ], [ 139,  95,  71 ], [ 155, 107,  83 ], [ 167, 123,  95 ], [ 183, 135, 107 ], [ 195, 147, 123 ], [ 211, 163, 139 ], [ 227, 179, 151 ],
+    // purple inverted
+    [ 171, 139, 163 ], [ 159, 127, 151 ], [ 147, 115, 135 ], [ 139, 103, 123 ], [ 127,  91, 111 ], [ 119,  83,  99 ], [ 107,  75,  87 ], [  95,  63,  75 ], [  87,  55,  67 ], [  75,  47,  55 ], [  67,  39,  47 ], [  55,  31,  35 ], [  43,  23,  27 ], [  35,  19,  19 ], [  23,  11,  11 ], [  15,   7,   7 ],
+    // magenta inverted
+    [ 187, 115, 159 ], [ 175, 107, 143 ], [ 163,  95, 131 ], [ 151,  87, 119 ], [ 139,  79, 107 ], [ 127,  75,  95 ], [ 115,  67,  83 ], [ 107,  59,  75 ], [  95,  51,  63 ], [  83,  43,  55 ], [  71,  35,  43 ], [  59,  31,  35 ], [  47,  23,  27 ], [  35,  19,  19 ], [  23,  11,  11 ], [  15,   7,   7 ],
+    // tan inverted
+    [ 219, 195, 187 ], [ 203, 179, 167 ], [ 191, 163, 155 ], [ 175, 151, 139 ], [ 163, 135, 123 ], [ 151, 123, 111 ], [ 135, 111,  95 ], [ 123,  99,  83 ], [ 107,  87,  71 ], [  95,  75,  59 ], [  83,  63,  51 ], [  67,  51,  39 ], [  55,  43,  31 ], [  39,  31,  23 ], [  27,  19,  15 ], [  15,  11,   7 ],
+    // light green inverted
+    [ 111, 131, 123 ], [ 103, 123, 111 ], [  95, 115, 103 ], [  87, 107,  95 ], [  79,  99,  87 ], [  71,  91,  79 ], [  63,  83,  71 ], [  55,  75,  63 ], [  47,  67,  55 ], [  43,  59,  47 ], [  35,  51,  39 ], [  31,  43,  31 ], [  23,  35,  23 ], [  15,  27,  19 ], [  11,  19,  11 ], [   7,  11,   7 ],
+    // yellow inverted
+    [ 255, 243,  27 ], [ 239, 223,  23 ], [ 219, 203,  19 ], [ 203, 183,  15 ], [ 187, 167,  15 ], [ 171, 151,  11 ], [ 155, 131,   7 ], [ 139, 115,   7 ], [ 123,  99,   7 ], [ 107,  83,   0 ], [  91,  71,   0 ], [  75,  55,   0 ], [  59,  43,   0 ], [  43,  31,   0 ], [  27,  15,   0 ], [  11,   7,   0 ],
+    // blue inverted
+    [   0,   0, 255 ], [  11,  11, 239 ], [  19,  19, 223 ], [  27,  27, 207 ], [  35,  35, 191 ], [  43,  43, 175 ], [  47,  47, 159 ], [  47,  47, 143 ], [  47,  47, 127 ], [  47,  47, 111 ], [  47,  47,  95 ], [  43,  43,  79 ], [  35,  35,  63 ], [  27,  27,  47 ], [  19,  19,  31 ], [  11,  11,  15 ],
+    // WHIIIIIIIIIITE ( supposed to be fire ??? )
+    [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ],
+    // brights ( seems incorrect )
+    [ 255, 255, 255 ], [ 255, 255, 255 ], [ 199, 195,  55 ], [ 231, 227,  87 ], [ 127, 191, 255 ], [ 171, 231, 255 ], [ 215, 255, 255 ], [ 103,   0,   0 ], [ 139,   0,   0 ], [ 179,   0,   0 ], [ 215,   0,   0 ], [ 255,   0,   0 ], [ 255, 243, 147 ], [ 255, 247, 199 ], [ 255, 255, 255 ], [ 159,  91,  83 ]
   ];
-}
-
-function createTextureFromMip( mip_tex, face_data, is_valve_fmt ) {
-  const { name, width, height, data } = mip_tex;
-  
-  let palette = ( is_valve_fmt )
-                ? mip_tex.palette
-                : getQuakePalette( );
-
-  const canvas = document.createElement( "canvas" );
-  canvas.height = height;
-  canvas.width = width;
-  canvas.id = name;
-
-  const ctx = canvas.getContext( "2d" );
-  const img_data = ctx.createImageData( width, height );
-
-  for ( let idx = 0; idx < data.length; ++idx ) {
-    const palette_idx = data[ idx ];
-
-    let alpha = 255;
-    if ( !is_valve_fmt && palette_idx >= 0xE0 )
-      alpha = 0;
-
-    const [ r, g, b ] = palette[ palette_idx ];
-    const i = idx * 4;
-
-    img_data.data[ i + 0 ] = r;
-    img_data.data[ i + 1 ] = g;
-    img_data.data[ i + 2 ] = b;
-    img_data.data[ i + 3 ] = alpha;
-  }
-
-  ctx.putImageData( img_data, 0, 0 );
-
-  const cdiv = document.createElement( "div" );  
-  
-  cdiv.innerText = name;
-  cdiv.appendChild( canvas );
-
-  cdiv.style.backgroundColor = "transparent";
-  cdiv.style.justifyContent = "center";
-  cdiv.style.flexDirection = "column";
-  cdiv.style.alignItems = "center";
-  cdiv.style.display = "flex";
-  cdiv.style.margin = "5px";
-  cdiv.style.color = "#777";
-
-  document.getElementById( 'side_collapsible_section' ).appendChild( cdiv );
-
-  // https://threejs.org/docs/#api/en/textures/Texture
-  const texture = new THREE.Texture( canvas );
-  
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.rotation = face_data.rotation;
-
-  //texture.wrapS = THREE.ClampToEdgeWrapping;
-  //texture.wrapT = THREE.ClampToEdgeWrapping;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-
-  if ( is_valve_fmt )
-    texture.offset.set( face_data.u.w, face_data.v.w );
-  else
-    texture.offset.set( face_data.uv_offset.x, face_data.uv_offset.y );
-
-  texture.repeat.set( face_data.uv_scale.x * 0.01, face_data.uv_scale.y * 0.01 );
-  texture.needsUpdate = true;
-  return texture;
 }
 
 function parseQuakeMapLine( line ) {
@@ -519,7 +220,7 @@ function computeIntersection( p0, p1, p2 ) {
 
   const denominator = n0.dot( new THREE.Vector3( ).crossVectors( n1, n2 ) );
 
-  if ( Math.abs( denominator ) < 1e-6 )
+  if ( Math.abs( denominator ) < FLT_EPSILON )
     return null;
 
   const term0 = new THREE.Vector3( ).crossVectors( n1, n2 ).multiplyScalar( -p0.constant );
@@ -577,6 +278,7 @@ function computeUVForVertex( vertex, line_data ) {
   if ( line_data.type === "VALVE" ) {
     const s = vertex.dot( new THREE.Vector3( line_data.u.x, line_data.u.y, line_data.u.z ) );
     const t = vertex.dot( new THREE.Vector3( line_data.v.x, line_data.v.y, line_data.v.z ) );
+    
     return new THREE.Vector2( s, t );
   }
   
@@ -618,8 +320,8 @@ function createFaceGeometry( verts, face_data ) {
   const positions = [ ];
   
   verts.forEach( v => {
-    positions.push( v.x, v.y, v.z );
     const uv = computeUVForVertex( v, face_data );
+    positions.push( v.x, v.y, v.z );
     uvs.push( uv.x, uv.y );
   });
   
@@ -635,12 +337,73 @@ function createFaceGeometry( verts, face_data ) {
   return geometry;
 }
 
-function parseMap( is_valve_fmt, map, wad ) {
+function createTextureFromMip( mip_tex, is_valve_fmt ) {
+  const palette = ( is_valve_fmt ) ? mip_tex.palette : getQuakePalette( );
+  const { name, width, height, data } = mip_tex;
+
+  const canvas = document.createElement( "canvas" );
+  canvas.height = height;
+  canvas.width = width;
+  canvas.id = name;
+
+  const ctx = canvas.getContext( "2d" );
+  const img_data = ctx.createImageData( width, height );
+
+  for ( let idx = 0; idx < data.length; ++idx ) {
+    const palette_idx = data[ idx ];
+
+    // fullbright ignores fire/lighting
+    let alpha = 255;
+    if ( !is_valve_fmt && palette_idx >= 0xE0 )
+      alpha = 0;
+
+    const [ r, g, b ] = palette[ palette_idx ];
+    const i = idx * 4;
+
+    img_data.data[ i + 0 ] = r;
+    img_data.data[ i + 1 ] = g;
+    img_data.data[ i + 2 ] = b;
+    img_data.data[ i + 3 ] = alpha;
+  }
+
+  ctx.putImageData( img_data, 0, 0 );
+
+  const cdiv = document.createElement( "div" );  
+  
+  cdiv.innerText = name;
+  cdiv.appendChild( canvas );
+
+  cdiv.style.backgroundColor = "transparent";
+  cdiv.style.justifyContent = "center";
+  cdiv.style.flexDirection = "column";
+  cdiv.style.alignItems = "center";
+  cdiv.style.display = "flex";
+  cdiv.style.margin = "5px";
+  cdiv.style.color = "#777";
+
+  const tex_showcase = document.getElementById( 'side_collapsible_section' );
+
+  tex_showcase.appendChild( cdiv );
+  // sort by canvas id ( name ) here each time ( or insert div into specific spot )
+
+  // https://threejs.org/docs/#api/en/textures/Texture
+  const texture = new THREE.Texture( canvas );
+
+  texture.center = new THREE.Vector2( 0.5, 0.5 );
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.flipY = false;
+  return texture;
+}
+
+function parseMap( is_valve_fmt, map_data, wad ) {
   const origin_regex = /"origin"\s*"(-?\d+)\s+(-?\d+)\s+(-?\d+)"/;
-  const map_group = new THREE.Group( );
+  const map = new THREE.Group( );
   let texture_list = new Map( );
 
-  const blocks = map.split( "}" ).join( "" )
+  const blocks = map_data.split( "}" ).join( "" )
                     .split( "{" )
                     .map( b => b.trim( ) )
                     .filter( b => b.length );
@@ -651,22 +414,20 @@ function parseMap( is_valve_fmt, map, wad ) {
 
     const face_data = [ ];
     for ( const line of lines ) {
-      // this works, but is wrong.
-      //  needs to scan when it's in an entity w/ classname:
-      //   "info_player_deathmatch"
-      //   "info_player_start"
       if ( !spawn_found && line.startsWith( "\"origin\"" ) ) {
         const match = line.match( origin_regex );
 
-        if ( match ) {
+        if ( match && (
+              block.includes( "info_player_start"      ) ||
+              block.includes( "info_player_deathmatch" ) ) ) {
           const origin = new THREE.Vector3(
             parseFloat( match[ 1 ] ),
             parseFloat( match[ 2 ] ),
             parseFloat( match[ 3 ] )
           );
 
-          cam.position.set( origin.x, origin.y, origin.z );
           cam.rotation.set( 0, Math.PI * 0.5, Math.PI * 0.5 );
+          cam.position.set( origin.x, origin.y, origin.z );
           spawn_found = true;
         }
       }
@@ -674,25 +435,22 @@ function parseMap( is_valve_fmt, map, wad ) {
       if ( !line.startsWith( "(" ) )
         continue;
 
-      let line_data;
-      if ( is_valve_fmt )
-        line_data = parseValveMapLine( line );
-      else
-        line_data = parseQuakeMapLine( line );
+      let line_data = ( is_valve_fmt )
+        ? parseValveMapLine( line )
+        : parseQuakeMapLine( line );
 
-      if ( line_data ) {
-        const plane = new THREE.Plane( ).setFromCoplanarPoints( line_data.v0, line_data.v1, line_data.v2 );
-        line_data.plane = plane;
+      if ( !line_data )
+        continue;
 
-        face_data.push( line_data );
-      }
+      line_data.plane = new THREE.Plane( ).setFromCoplanarPoints( line_data.v0, line_data.v1, line_data.v2 );;
+      face_data.push( line_data );
     }
 
     if ( block[ 0 ] !== '(' )
       continue;
 
     if ( face_data.length < 4 ) {
-      console.error( "too few planes for brush:", block );
+      console.error( `too few planes ( ${ face_data.length } ) for brush:`, block );
       continue;
     }
 
@@ -707,7 +465,7 @@ function parseMap( is_valve_fmt, map, wad ) {
           if ( !pt || !isPointInsideBrush( pt, planes ) )
             continue;
 
-          if ( vertices.some( v => v.distanceToSquared( pt ) < 1e-6 ) )
+          if ( vertices.some( v => v.distanceToSquared( pt ) < FLT_EPSILON ) )
             continue;
 
           vertices.push( pt );
@@ -720,7 +478,7 @@ function parseMap( is_valve_fmt, map, wad ) {
       return;
     }
 
-    const brush_group = new THREE.Group( );
+    const brushes = new THREE.Group( );
 
     let unique_textures = new Set( );
     for ( const fd of face_data ) {
@@ -742,13 +500,25 @@ function parseMap( is_valve_fmt, map, wad ) {
             continue;
           }
   
-          const texture = createTextureFromMip( matching_texture, fd, is_valve_fmt );
+          const texture = createTextureFromMip( matching_texture, is_valve_fmt );
           texture_list.set( fd.texture, texture );
           unique_textures.add( fd.texture );
         }
       }
 
       const texture = texture_list.get( fd.texture );
+
+      const uv_offset = ( is_valve_fmt )
+        ? new THREE.Vector2( fd.u.w, fd.v.w ) : fd.uv_offset;
+      
+      texture.rotation = THREE.MathUtils.degToRad( fd.rotation );
+
+      // THESE TWO ARE WRONG SOMEHOW ! TEXTURES ARE SUPER SMALL AND EVEN WHEN MULTIPLIED BY 0.01 IT'S WRONG SIZE
+      texture.repeat.set( fd.uv_scale.x, fd.uv_scale.y );
+      texture.offset.copy( uv_offset );
+
+      texture.needsUpdate = true;
+
       const face_geometry = createFaceGeometry( face_verts, fd );
       const face_material = new THREE.MeshBasicMaterial({
         side: THREE.BackSide,
@@ -756,13 +526,13 @@ function parseMap( is_valve_fmt, map, wad ) {
       });
 
       const face_mesh = new THREE.Mesh( face_geometry, face_material );
-      brush_group.add( face_mesh );
+      brushes.add( face_mesh );
     }
 
-    map_group.add( brush_group );
+    map.add( brushes );
   }
 
-  scene.add( map_group );
+  scene.add( map );
   return true;
 }
 
@@ -819,16 +589,19 @@ function init( ) {
   
   document.body.appendChild( renderer.domElement );
   
+  // this may be wrong for mobile
   controls.dragToLook = ( w > h );
-  controls.movementSpeed = 500;
-  controls.rollSpeed = 1;
+  controls.movementSpeed = 300;
+  controls.rollSpeed = 0.5;
 
   return loadDefaultMap( );
 }
 
 function render( ) {
   requestAnimationFrame( render );
-  controls.update( 0.01 ); // 1 / 100
+
+  controls.update( 0.016 ); // 1 / 60
+
   renderer.render( scene, cam );
 }
 
@@ -860,17 +633,33 @@ function toggleBottomCollapsibleSection( e ) {
   btn.style.bottom = ( !btn.classList.contains( 'active' ) ) ? "8px" : "136px";
 }
 
+function toggleWireframe( e ) {
+  scene.traverse( c => {
+    if ( c.isMesh && c.material ) {
+      c.material.wireframe = !c.material.wireframe;
+      c.material.needsUpdate = true;
+    }
+  });
+}
+
 document.addEventListener( "DOMContentLoaded", ( ) => {
   document.getElementById( 'bottom_collapsible_btn' ).onclick = toggleBottomCollapsibleSection;
   document.getElementById( 'side_collapsible_btn' ).onclick = toggleSideCollapsibleSection;
+  document.getElementById( 'wireframe' ).onclick = toggleWireframe;
 
   // add upload map and wad events to parse shi
+});
+
+document.addEventListener( "keyup", ( e ) => {
+  const cb = document.getElementById( 'wireframe' );
+
+  if ( e.key === 'x' )
+    cb.click( );
 });
 
 onresize = ( ) => {
   const h = window.innerHeight;
   const w = window.innerWidth;
-
   renderer.setSize( w,  h );
   cam.aspect = w / h;
 

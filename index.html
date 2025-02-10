@@ -19,15 +19,19 @@
 
     <button type="button" id="bottom_collapsible_btn">+</button>
     <div id="bottom_collapsible_section">
-      <input type="file" id="map" accept=".map" name="mapfilename" hidden>
-      <input type="file" id="wad" accept=".wad" name="wadfilename" hidden>
-
       <div>
+        <input type="checkbox" id="wireframe">
+        Wireframe
+      </div>
+      
+      <div>
+        <input type="file" id="map" accept=".map" name="mapfilename" hidden>
         <label for="map">Choose MAP</label>
         <span id="map_name"> </span>
       </div>
-
+      
       <div>
+        <input type="file" id="wad" accept=".wad" name="wadfilename" hidden>
         <label for="wad">Choose WAD</label>
         <span id="wad_name"> </span>
       </div>
