@@ -4,7 +4,7 @@
 "chaptertitle" "C0A1TITLE"
 "angles" "0 0 0"
 "mapversion" "220"
-"wad" "halflife.wad"
+"wad" "files/valve/halflife.wad"
 "_generator" "J.A.C.K. 1.1.3773 Freeware (vpHalfLife)"
 {
 ( -1408 216 -80 ) ( -1408 232 -80 ) ( -1408 216 -240 ) C2A4E_W1B [ 0 1 0 0 ] [ 0 0 -1 0 ] -0 1 1

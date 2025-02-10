@@ -359,6 +359,7 @@ function createFaceGeometry( verts, face_data, texture ) {
 }
 
 function createTextureFromMip( mip_tex, is_valve_fmt ) {
+  const tex_showcase = document.getElementById( 'side_collapsible_section' );
   const palette = ( is_valve_fmt ) ? mip_tex.palette : getQuakePalette( );
   const { name, width, height, data } = mip_tex;
 
@@ -390,10 +391,6 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   ctx.putImageData( img_data, 0, 0 );
 
   const cdiv = document.createElement( "div" );  
-  
-  cdiv.innerText = name;
-  cdiv.appendChild( canvas );
-
   cdiv.style.backgroundColor = "transparent";
   cdiv.style.justifyContent = "center";
   cdiv.style.flexDirection = "column";
@@ -402,15 +399,12 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   cdiv.style.margin = "5px";
   cdiv.style.color = "#777";
 
-  const tex_showcase = document.getElementById( 'side_collapsible_section' );
-
+  cdiv.id = name;
+  cdiv.innerText = name;
+  cdiv.appendChild( canvas );
   tex_showcase.appendChild( cdiv );
-  // sort by canvas id ( name ) here each time ( or insert div into specific spot )
-
-  // https://threejs.org/docs/#api/en/textures/Texture
+  
   const texture = new THREE.Texture( canvas );
-
-  //texture.center = new THREE.Vector2( 0.5, 0.5 );
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
   texture.wrapS = THREE.RepeatWrapping;
@@ -420,6 +414,33 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   texture.needsUpdate = true;
 
   return texture;
+}
+
+function sortDomChildrenById( id ) {
+  const container = document.getElementById( id );
+
+  if ( !container )
+    return;
+
+  const elements = Array.from( container.children );
+
+  if ( !elements )
+    return;
+
+  elements.sort( ( a, b ) => {
+    const id_a = a.id.toUpperCase( );
+    const id_b = b.id.toUpperCase( );
+
+    if ( id_a < id_b )
+      return -1;
+    
+    if ( id_a > id_b )
+      return  1;
+
+    return 0;
+  });
+
+  elements.forEach( el => container.appendChild( el ) );
 }
 
 function parseMap( is_valve_fmt, map_data, wad ) {
@@ -439,11 +460,11 @@ function parseMap( is_valve_fmt, map_data, wad ) {
     const face_data = [ ];
     for ( const line of lines ) {
       if ( !spawn_found && line.startsWith( "\"origin\"" ) ) {
+        const is_spawn = block.includes( "info_player_deathmatch" )
+                      || block.includes( "info_player_start" );
         const match = line.match( origin_regex );
 
-        if ( match && (
-              block.includes( "info_player_start"      ) ||
-              block.includes( "info_player_deathmatch" ) ) ) {
+        if ( match && is_spawn ) {
           const origin = new THREE.Vector3(
             parseFloat( match[ 1 ] ),
             parseFloat( match[ 2 ] ),
@@ -544,6 +565,8 @@ function parseMap( is_valve_fmt, map_data, wad ) {
     map.add( brushes );
   }
 
+  sortDomChildrenById( "side_collapsible_section" );
+
   scene.add( map );
   return true;
 }
@@ -553,29 +576,52 @@ function setHudNames( m, w ) {
   document.getElementById( 'wad_name' ).innerText = w;
 }
 
-function loadDefaultMap( ) {
-  const wad_name = "halflife.wad";
-  const map_name = "c1a0.map";
+function extractFirstWadName( map_data ) {
+  const wad_regex = /^"wad"\s*"([^";]+?\.wad)(?=;|")/;
 
-  Promise.all([
-    fetch(`files/valve/${ map_name }`).then( res => res.text( ) ),
-    fetch(`files/valve/${ wad_name }`).then( res => res.arrayBuffer( ) )
-  ])
-  .then( ( [ map_data, wad_data ] ) => {
+  const blocks = map_data.split( "}" ).join( "" )
+                         .split( "{" )
+                         .map( b => b.trim( ) )
+                         .filter( b => b.length );
+
+  for ( const block of blocks ) {
+    const lines = block.split( "\n" ).map( l => l.trim( ) ).filter( l => l.length );
+
+    for ( const line of lines ) {
+      if ( !line.startsWith( "\"wad\"" ) )
+        continue;
+
+      const match = line.match( wad_regex );
+      
+      if ( !match )
+        continue;
+
+      return match[ 1 ];
+    }
+  }
+
+  return null;
+}
+
+async function loadDefaultMap( map ) {
+  try {
+    const map_data = await fetch( map ).then( res => res.text( ) );
     const valve_map = map_data.includes( "[" ) || map_data.includes( "]" );
+    const wad_name = extractFirstWadName( map_data );
+
+    if ( !wad_name )
+      throw new Error( `failed to find wad in ${ map }` );
+
+    const wad_data = await fetch( wad_name ).then( res => res.arrayBuffer( ) );
     const wad = loadWad( wad_data );
 
-    if ( parseMap( valve_map, map_data, wad ) ) {
+    if ( parseMap( valve_map, map_data, wad ) )
+      setHudNames( map, wad_name );
+  } catch ( err ) {
+    console.error( "failed to load default map:", err );
+    return false;
+  }
 
-      const map_name_type = map_name + " | " + ( valve_map ? "(VALVE)" : "(QUAKE)" );
-
-      setHudNames( map_name_type, wad_name );
-    }
-  })
-  .catch( err => {
-    console.error( 'failed to load default map:', err );
-  });
-  
   return true;
 }
 
@@ -583,9 +629,13 @@ let cam;
 let scene;
 let renderer;
 let controls;
-function init( ) {
+async function init( ) {
+  setProgress( 0 );
+
   if ( !WebGL.isWebGL2Available( ) )
     return false;
+
+  setProgress( 5 );
 
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -606,7 +656,7 @@ function init( ) {
   controls.movementSpeed = 300;
   controls.rollSpeed = 0.5;
 
-  return loadDefaultMap( );
+  return await loadDefaultMap( "files/valve/c1a0.map" );
 }
 
 function render( ) {
@@ -654,20 +704,73 @@ function toggleWireframe( e ) {
   });
 }
 
+let prev_map_selection = null;
+function selectChangeMap( e ) {
+  const tex_showcase = document.getElementById( 'side_collapsible_section' );
+  const cb = document.getElementById( 'wireframe' );
+  const selection = e.target.value;
+
+  if ( selection === "File Upload" || selection === prev_map_selection )
+    return;
+
+  if ( cb.checked )
+    cb.checked = false;
+
+  scene.clear( );
+  tex_showcase.innerHTML = "";
+  prev_map_selection = e.target.value;
+  Promise.resolve( loadDefaultMap( e.target.value ) );
+}
+
+function hideProgress( ) {
+  const progress = document.getElementById( 'progress' );
+
+  if ( !progress )
+    return;
+
+  progress.style.display = "none";
+}
+
+function setProgress( val ) {
+  const progress = document.getElementById( 'progress' );
+
+  if ( !progress )
+    return;
+
+  if ( typeof val !== "number" )
+    return;
+
+  if ( progress.style.display === "none" )
+    progress.style.display = "block";
+
+  progress.value = val;
+}
+
 document.addEventListener( "DOMContentLoaded", ( ) => {
   document.getElementById( 'bottom_collapsible_btn' ).onclick = toggleBottomCollapsibleSection;
   document.getElementById( 'side_collapsible_btn' ).onclick = toggleSideCollapsibleSection;
+  document.getElementById( 'map_picker' ).onchange = selectChangeMap;
   document.getElementById( 'wireframe' ).onclick = toggleWireframe;
 
-  // add upload map and wad events to parse shi
+  // add upload map and wad events to parse shi 
 });
 
-document.addEventListener( "keyup", ( e ) => {
+onkeyup = ( e ) => {
   const cb = document.getElementById( 'wireframe' );
 
   if ( e.key === 'x' )
     cb.click( );
-});
+};
+
+onkeydown = ( e ) => {
+  const select = document.getElementById( 'map_picker' );
+  
+  if ( !select )
+    return;
+
+  if ( e.target === select )
+    e.preventDefault( );
+};
 
 onresize = ( ) => {
   const h = window.innerHeight;
@@ -678,5 +781,7 @@ onresize = ( ) => {
   cam.updateProjectionMatrix( );
 };
 
-if ( init( ) ) render( );
-else document.body.appendChild( WebGL.getWebGL2ErrorMessage( ) );
+if ( await init( ) )
+  render( );
+else
+  document.body.appendChild( WebGL.getWebGL2ErrorMessage( ) );

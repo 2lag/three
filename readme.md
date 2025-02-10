@@ -1,15 +1,15 @@
 ### todo
- - have selectable default maps as well as custom upload :
-   - c1a0 as default map
-   - dm1 as default map for quake
+ - make loading/parsing faster
+   - more async & less regex o wat ?_?
 
- - sort textures in side panel by name
+ - show status of loading with progress bar ( alr impld, just need integ )
+   - make it animated
 
  - fix texture offsets / scaling, still not 100% correct ( on both quake and valve maps )
 
  - go through all comments / todo's
 
- - clean all this fucking code its a mess ( split up the functionality as much as possible )\
+ - clean all this fucking code its a mess ( split up the functionality as much as possible )
    - no functions longer than 60 lines, no wider than 80-90 chars
 
  - test map loading from file upload

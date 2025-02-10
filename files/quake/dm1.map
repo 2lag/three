@@ -1,7 +1,7 @@
 {
 "message" "Place of Two Deaths"
 "classname" "worldspawn"
-"wad" "medieval.wad"
+"wad" "files/quake/medieval.wad"
 "worldtype" "0"
 "sounds" "5"
 {

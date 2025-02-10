@@ -1,94 +1,113 @@
 :root {
-  --back: #000;
-  --left-slide: left 0.1s ease-in-out;
-  --bottom-slide: bottom 0.1s ease-in-out;
   --height-slide: height 0.1s ease-in-out;
+  --bottom-slide: bottom 0.1s ease-in-out;
+  --left-slide: left 0.1s ease-in-out;
+  --progress-color: #774477;
+  --back: #000;
 }
 
 span { margin: 5px !important; }
 html { overflow: hidden; }
 body { margin: 0; }
 
-label,
+#progress {
+  color: var( --progress-color );
+  background-color: transparent;
+  border: 1px solid black;
+  -webkit-appearance: none;
+  left: calc( 50% - 64px );
+  top: calc( 50% - 8px );
+  -moz-appearance: none;
+  border-radius: 10px;
+  appearance: none;
+  position: fixed;
+  display: none;
+  outline: none;
+  height: 16px;
+  width: 128px;
+}
+#progress::-moz-progress-bar, #progress::-webkit-progress-value { background: var( --progress-color ); }
+
+label, select,
 #side_collapsible_btn,
 #bottom_collapsible_btn {
-  margin: 0;
-  padding: 5px;
-  color: #999;
-  cursor: pointer;
-  border-radius: 5px;
-  border: 1px solid #111;
   background-color: #333;
+  border: 1px solid #111;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #999;
+  padding: 5px;
+  margin: 0;
 }
 
 #side_collapsible_btn {
-  right: 0;
-  left: 8px;
-  width: 32px;
-  position: fixed;
-  aspect-ratio: 1;
-  top: calc( 50% - 16px );
   transition: var( --left-slide );
+  top: calc( 50% - 16px );
+  aspect-ratio: 1;
+  position: fixed;
+  width: 32px;
+  left: 8px;
+  right: 0;
 }
 
 #bottom_collapsible_btn {
-  bottom: 8px;
-  width: 32px;
-  position: fixed;
-  aspect-ratio: 1;
-  left: calc( 50% - 16px );
   transition: var( --bottom-slide );
+  left: calc( 50% - 16px );
+  aspect-ratio: 1;
+  position: fixed;
+  width: 32px;
+  bottom: 8px;
 }
 
 #side_collapsible_section {
-  top: 0;
-  left: -100%;
-  height: 100%;
-  display: flex;
-  position: fixed;
-  flex-wrap: wrap;
-  min-width: 128px;
-  overflow-x: hidden;
-  overflow-y: scroll;
-  align-items: center;
-  flex-direction: row;
-  padding: 0 !important;
-  justify-content: center;
-  border: 1px solid #111;
-  width: calc( 25% - 32px );
-  background-color: rgba( 0.9, 0.9, 0.9, 0.6 );
   transition: var( --left-slide ), var( --height-slide );
+  background-color: rgba( 0.9, 0.9, 0.9, 0.6 );
+  width: calc( 25% - 32px );
+  border: 1px solid #111;
+  justify-content: center;
+  padding: 0 !important;
+  flex-direction: row;
+  align-items: center;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  min-width: 128px;
+  flex-wrap: wrap;
+  position: fixed;
+  display: flex;
+  height: 100%;
+  left: -100%;
+  top: 0;
 }
 
 #side_collapsible_section.active { left: 0px }
 
 #bottom_collapsible_section {
-  left: 0;
-  width: 100%;
-  color: #999;
-  height: 128px;
-  display: flex;
-  bottom: -128px;
-  position: fixed;
-  flex-wrap: wrap;
-  overflow: hidden;
-  align-items: center;
-  flex-direction: row;
-  padding: 0 !important;
-  justify-content: center;
-  border: 1px solid #111;
-  transition: var( --bottom-slide );
   background-color: rgba( 0.9, 0.9, 0.9, 0.6 );
+  transition: var( --bottom-slide );
+  border: 1px solid #111;
+  justify-content: center;
+  padding: 0 !important;
+  flex-direction: row;
+  align-items: center;
+  overflow: hidden;
+  flex-wrap: wrap;
+  position: fixed;
+  bottom: -128px;
+  display: flex;
+  height: 128px;
+  color: #999;
+  width: 100%;
+  left: 0;
 }
 
 #bottom_collapsible_section.active { bottom: 0px }
 
 #bottom_collapsible_section > div {
-  margin: 5px;
-  display: flex;
-  align-items: center;
-  flex-direction: column;
   justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  display: flex;
+  margin: 5px;
 }
 
 #bottom_collapsible_btn > div > span { font-size: 12px; }
