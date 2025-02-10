@@ -274,12 +274,27 @@ function getFacePolygon( plane, verts ) {
   return face_verts;
 }
 
-function computeUVForVertex( vertex, line_data ) {
+function computeUVForVertex( vertex, line_data, texture ) {
   if ( line_data.type === "VALVE" ) {
-    const s = vertex.dot( new THREE.Vector3( line_data.u.x, line_data.u.y, line_data.u.z ) );
-    const t = vertex.dot( new THREE.Vector3( line_data.v.x, line_data.v.y, line_data.v.z ) );
+    const u_vec = new THREE.Vector3( line_data.u.x, line_data.u.y, line_data.u.z );
+    const v_vec = new THREE.Vector3( line_data.v.x, line_data.v.y, line_data.v.z )
+    // vivek ramaswamy mentioned ??
+
+    const angle = THREE.MathUtils.degToRad( line_data.rotation );
+
+    const cos = Math.cos( angle );
+    const sin = Math.sin( angle );
+
+    const rotated_u = u_vec.clone( ).multiplyScalar( cos ).add( v_vec.clone( ).multiplyScalar( -sin ) );
+    const rotated_v = u_vec.clone( ).multiplyScalar( sin ).add( v_vec.clone( ).multiplyScalar(  cos ) );
     
-    return new THREE.Vector2( s, t );
+    const u = vertex.dot( rotated_u ) + line_data.u.w;
+    const v = vertex.dot( rotated_v ) + line_data.v.w;
+
+    return new THREE.Vector2(
+      u / texture.image.width,
+      v / texture.image.height
+    );
   }
   
   const normal = line_data.plane.normal;
@@ -291,18 +306,24 @@ function computeUVForVertex( vertex, line_data ) {
   const u_axis = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
   const v_axis = new THREE.Vector3( ).crossVectors( normal, u_axis ).normalize( );
 
-  const angle = line_data.rotation * Math.PI / 180;
+  const angle = THREE.MathUtils.degToRad( line_data.rotation );
+
   const cos = Math.cos( angle );
   const sin = Math.sin( angle );
+
   const rotated_u = u_axis.clone( ).multiplyScalar( cos ).add( v_axis.clone( ).multiplyScalar( -sin ) );
   const rotated_v = u_axis.clone( ).multiplyScalar( sin ).add( v_axis.clone( ).multiplyScalar(  cos ) );
 
-  const s = vertex.dot( rotated_u ) * line_data.uv_scale.x + line_data.uv_offset.x;
-  const t = vertex.dot( rotated_v ) * line_data.uv_scale.y + line_data.uv_offset.y;
-  return new THREE.Vector2( s, t );
+  const u = vertex.dot( rotated_u ) * line_data.uv_scale.x + line_data.uv_offset.x;
+  const v = vertex.dot( rotated_v ) * line_data.uv_scale.y + line_data.uv_offset.y;
+  
+  return new THREE.Vector2(
+    u / texture.image.width,
+    v / texture.image.height
+  );
 }
 
-function createFaceGeometry( verts, face_data ) {
+function createFaceGeometry( verts, face_data, texture ) {
   const normal = face_data.plane.normal;
 
   let tangent = new THREE.Vector3( 0, 1, 0 );
@@ -320,7 +341,7 @@ function createFaceGeometry( verts, face_data ) {
   const positions = [ ];
   
   verts.forEach( v => {
-    const uv = computeUVForVertex( v, face_data );
+    const uv = computeUVForVertex( v, face_data, texture );
     positions.push( v.x, v.y, v.z );
     uvs.push( uv.x, uv.y );
   });
@@ -389,12 +410,15 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   // https://threejs.org/docs/#api/en/textures/Texture
   const texture = new THREE.Texture( canvas );
 
-  texture.center = new THREE.Vector2( 0.5, 0.5 );
+  //texture.center = new THREE.Vector2( 0.5, 0.5 );
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.flipY = false;
+  
+  texture.needsUpdate = true;
+
   return texture;
 }
 
@@ -507,19 +531,7 @@ function parseMap( is_valve_fmt, map_data, wad ) {
       }
 
       const texture = texture_list.get( fd.texture );
-
-      const uv_offset = ( is_valve_fmt )
-        ? new THREE.Vector2( fd.u.w, fd.v.w ) : fd.uv_offset;
-      
-      texture.rotation = THREE.MathUtils.degToRad( fd.rotation );
-
-      // THESE TWO ARE WRONG SOMEHOW ! TEXTURES ARE SUPER SMALL AND EVEN WHEN MULTIPLIED BY 0.01 IT'S WRONG SIZE
-      texture.repeat.set( fd.uv_scale.x, fd.uv_scale.y );
-      texture.offset.copy( uv_offset );
-
-      texture.needsUpdate = true;
-
-      const face_geometry = createFaceGeometry( face_verts, fd );
+      const face_geometry = createFaceGeometry( face_verts, fd, texture );
       const face_material = new THREE.MeshBasicMaterial({
         side: THREE.BackSide,
         map: texture
