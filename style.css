@@ -1,3 +1,9 @@
+@font-face {
+  font-family: DOS;
+  src: url( './Web437_DOS-V_re_ANK24.woff' );
+}
+* { font-family: DOS; }
+
 :root {
   --height-slide: height 0.1s ease-in-out;
   --bottom-slide: bottom 0.1s ease-in-out;
@@ -89,7 +95,8 @@ label, select,
   padding: 0 !important;
   flex-direction: row;
   align-items: center;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: scroll;
   flex-wrap: wrap;
   position: fixed;
   bottom: -128px;
@@ -111,6 +118,16 @@ label, select,
 }
 
 #bottom_collapsible_btn > div > span { font-size: 12px; }
+
+.texture_showcase {
+  background-color: transparent;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  display: flex;
+  color: #777;
+  margin: 5px;
+}
 
 #side_collapsible_section > div > canvas {
   max-width: 45%;

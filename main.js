@@ -4,174 +4,23 @@ import WebGL from 'three/addons/capabilities/WebGL.js';
 
 import { FlyControls } from 'three/addons/controls/FlyControls.js';
 
+import { getQuakePalette } from './js/static.js'
+import WadParser from './js/WadParser.js';
+
+const UPDATE_TIME = 1 / 60;
 const FLT_EPSILON = 1e-6;
-
-class WadParser {
-  constructor( array_buffer ) {
-    this.data = new DataView( array_buffer );
-    this.directory = [ ];
-    this.header = { };
-    this.offset = 0;
-  }
-
-  readString( length ) {
-    let chars = [ ];
-
-    for ( let idx = 0; idx < length; ++idx )
-      chars.push( this.data.getUint8( this.offset++ ) );
-
-    return String.fromCharCode( ...chars ).replace( /\0.*$/, '' );
-  }
-
-  readInt32( ) {
-    let value = this.data.getInt32( this.offset, true );
-    this.offset += 4;
-    return value;
-  }
-
-  parseHeader( ) {
-    this.offset = 0;
-    this.header.magic = this.readString( 4 );
-    this.header.num_dirs = this.readInt32( );
-    this.header.dir_offset = this.readInt32( );
-
-    if ( this.header.magic !== "WAD3" && this.header.magic !== "WAD2" )
-      throw new Error( `invalid WAD file: ${ this.header.magic }` );
-  }
-
-  parseDirectory( ) {
-    this.offset = this.header.dir_offset;
-
-    for ( let idx = 0; idx < this.header.num_dirs; ++idx ) {
-      let entry = {
-        offset: this.readInt32( ),
-        disk_size: this.readInt32( ),
-        size: this.readInt32( ),
-        type: this.data.getUint8( this.offset++ ),
-        compressed: this.data.getUint8( this.offset++ ),
-        padding: this.data.getUint16( this.offset += 2, true ),
-        name: this.readString( 16 )
-      };
-
-      this.directory.push( entry );
-    }
-  }
-
-  extractMipTexture( entry, is_valve_fmt ) {
-    this.offset = entry.offset;
-
-    const base = this.offset;
-    const name = this.readString( 16 );
-    const width = this.readInt32( );
-    const height = this.readInt32( );
-    const offset = this.readInt32( );
-
-    this.offset = entry.offset + offset;
-
-    let size = width * height;
-    let data = new Uint8Array( size );
-
-    for ( let d_idx = 0; d_idx < size; ++d_idx )
-      data[ d_idx ] = this.data.getUint8( this.offset++ );
-
-    if ( !is_valve_fmt )
-      return { name, width, height, data };
-
-    const palette = extractPalette( this.data, base, width, height );
-    return { name, width, height, data, palette };
-  }
-
-  extractTextureFromName( name, is_valve_fmt ) {
-    let dir_entry = null;
-    
-    for ( const d of this.directory ) {
-      if ( d.name.toUpperCase( ) === name )
-        dir_entry = d;
-    }
-    
-    if ( !dir_entry )
-      return null;
-
-    if ( dir_entry.type !== 0x43 && is_valve_fmt ) {
-      console.error( `valve non miptexture: ${ dir_entry.name }` );
-      return null;
-    }
-
-    if ( dir_entry.type !== 0x44 && !is_valve_fmt ) {
-      console.error( `quake non miptexture: ${ dir_entry.name }` );
-      return null;
-    }
-    
-    return this.extractMipTexture( dir_entry, is_valve_fmt );
-  }
-}
 
 function loadWad( wad_data ) {
   let parser = new WadParser( wad_data );
-  parser.parseHeader( );
-  parser.parseDirectory( );
-  return parser;
-}
 
-function extractPalette( data_view, base_offset, w, h ) {
-  const header_sz = 40;
-  const mip0_sz = w * h;
-  const mip1_sz = ( w >> 1 ) * ( h >> 1 );
-  const mip2_sz = ( w >> 2 ) * ( h >> 2 );
-  const mip3_sz = ( w >> 3 ) * ( h >> 3 );
-
-  let palette_offset = base_offset +
-                       header_sz +
-                       mip0_sz + mip1_sz +
-                       mip2_sz + mip3_sz + 2;
-
-  const palette = new Array( 256 );
-  for ( let idx = 0; idx < palette.length; ++idx ) {
-    const r = data_view.getUint8( palette_offset++ );
-    const g = data_view.getUint8( palette_offset++ );
-    const b = data_view.getUint8( palette_offset++ );
-
-    palette[ idx ] = [ r, g, b ];
+  try {
+    parser.parseHeader( );
+  } catch( err ) {
+    // todo : display `Invalid WAD : ${ parser.header.magic }` msg on screen
   }
 
-  return palette;
-}
-
-function getQuakePalette( ) {
-  return [
-    // grayscale
-    [   0,   0,   0 ], [  15,  15,  15 ], [  31,  31,  31 ], [  47,  47,  47 ], [  63,  63,  63 ], [  75,  75,  75 ], [  91,  91,  91 ], [ 107, 107, 107 ], [ 123, 123, 123 ], [ 139, 139, 139 ], [ 155, 155, 155 ], [ 171, 171, 171 ], [ 187, 187, 187 ], [ 203, 203, 203 ], [ 219, 219, 219 ], [ 235, 235, 235 ],
-    // brown
-    [  15,  11,   7 ], [  23,  15,  11 ], [  31,  23,  11 ], [  39,  27,  15 ], [  47,  35,  19 ], [  55,  43,  23 ], [  63,  47,  23 ], [  75,  55,  27 ], [  83,  59,  27 ], [  91,  67,  31 ], [  99,  75,  31 ], [ 107,  83,  31 ], [ 115,  87,  31 ], [ 123,  95,  35 ], [ 131, 103,  35 ], [ 143, 111,  35 ],
-    // light blue
-    [  11,  11,  15 ], [  19,  19,  27 ], [  27,  27,  39 ], [  39,  39,  51 ], [  47,  47,  63 ], [  55,  55,  75 ], [  63,  63,  87 ], [  71,  71, 103 ], [  79,  79, 115 ], [  91,  91, 127 ], [  99,  99, 139 ], [ 107, 107, 151 ], [ 115, 115, 163 ], [ 123, 123, 175 ], [ 131, 131, 187 ], [ 139, 139, 203 ],
-    // green
-    [   0,   0,   0 ], [   7,   7,   0 ], [  11,  11,   0 ], [  19,  19,   0 ], [  27,  27,   0 ], [  35,  35,   0 ], [  43,  43,   7 ], [  47,  47,   7 ], [  55,  55,   7 ], [  63,  63,   7 ], [  71,  71,   7 ], [  75,  75,  11 ], [  83,  83,  11 ], [  91,  91,  11 ], [  99,  99,  11 ], [ 107, 107,  15 ],
-    // red
-    [   7,   0,   0 ], [  15,   0,   0 ], [  23,   0,   0 ], [  31,   0,   0 ], [  39,   0,   0 ], [  47,   0,   0 ], [  55,   0,   0 ], [  63,   0,   0 ], [  71,   0,   0 ], [  79,   0,   0 ], [  87,   0,   0 ], [  95,   0,   0 ], [ 103,   0,   0 ], [ 111,   0,   0 ], [ 119,   0,   0 ], [ 127,   0,   0 ],
-    // orange
-    [  19,  19,   0 ], [  27,  27,   0 ], [  35,  35,   0 ], [  47,  43,   0 ], [  55,  47,   0 ], [  67,  55,   0 ], [  75,  59,   7 ], [  87,  67,   7 ], [  95,  71,   7 ], [ 107,  75,  11 ], [ 119,  83,  15 ], [ 131,  87,  19 ], [ 139,  91,  19 ], [ 151,  95,  27 ], [ 163,  99,  31 ], [ 175, 103,  35 ],
-    // gold
-    [  35,  19,   7 ], [  47,  23,  11 ], [  59,  31,  15 ], [  75,  35,  19 ], [  87,  43,  23 ], [  99,  47,  31 ], [ 115,  55,  35 ], [ 127,  59,  43 ], [ 143,  67,  51 ], [ 159,  79,  51 ], [ 175,  99,  47 ], [ 191, 119,  47 ], [ 207, 143,  43 ], [ 223, 171,  39 ], [ 239, 203,  31 ], [ 255, 243,  27 ],
-    // peach
-    [  11,   7,   0 ], [  27,  19,   0 ], [  43,  35,  15 ], [  55,  43,  19 ], [  71,  51,  27 ], [  83,  55,  35 ], [  99,  63,  43 ], [ 111,  71,  51 ], [ 127,  83,  63 ], [ 139,  95,  71 ], [ 155, 107,  83 ], [ 167, 123,  95 ], [ 183, 135, 107 ], [ 195, 147, 123 ], [ 211, 163, 139 ], [ 227, 179, 151 ],
-    // purple inverted
-    [ 171, 139, 163 ], [ 159, 127, 151 ], [ 147, 115, 135 ], [ 139, 103, 123 ], [ 127,  91, 111 ], [ 119,  83,  99 ], [ 107,  75,  87 ], [  95,  63,  75 ], [  87,  55,  67 ], [  75,  47,  55 ], [  67,  39,  47 ], [  55,  31,  35 ], [  43,  23,  27 ], [  35,  19,  19 ], [  23,  11,  11 ], [  15,   7,   7 ],
-    // magenta inverted
-    [ 187, 115, 159 ], [ 175, 107, 143 ], [ 163,  95, 131 ], [ 151,  87, 119 ], [ 139,  79, 107 ], [ 127,  75,  95 ], [ 115,  67,  83 ], [ 107,  59,  75 ], [  95,  51,  63 ], [  83,  43,  55 ], [  71,  35,  43 ], [  59,  31,  35 ], [  47,  23,  27 ], [  35,  19,  19 ], [  23,  11,  11 ], [  15,   7,   7 ],
-    // tan inverted
-    [ 219, 195, 187 ], [ 203, 179, 167 ], [ 191, 163, 155 ], [ 175, 151, 139 ], [ 163, 135, 123 ], [ 151, 123, 111 ], [ 135, 111,  95 ], [ 123,  99,  83 ], [ 107,  87,  71 ], [  95,  75,  59 ], [  83,  63,  51 ], [  67,  51,  39 ], [  55,  43,  31 ], [  39,  31,  23 ], [  27,  19,  15 ], [  15,  11,   7 ],
-    // light green inverted
-    [ 111, 131, 123 ], [ 103, 123, 111 ], [  95, 115, 103 ], [  87, 107,  95 ], [  79,  99,  87 ], [  71,  91,  79 ], [  63,  83,  71 ], [  55,  75,  63 ], [  47,  67,  55 ], [  43,  59,  47 ], [  35,  51,  39 ], [  31,  43,  31 ], [  23,  35,  23 ], [  15,  27,  19 ], [  11,  19,  11 ], [   7,  11,   7 ],
-    // yellow inverted
-    [ 255, 243,  27 ], [ 239, 223,  23 ], [ 219, 203,  19 ], [ 203, 183,  15 ], [ 187, 167,  15 ], [ 171, 151,  11 ], [ 155, 131,   7 ], [ 139, 115,   7 ], [ 123,  99,   7 ], [ 107,  83,   0 ], [  91,  71,   0 ], [  75,  55,   0 ], [  59,  43,   0 ], [  43,  31,   0 ], [  27,  15,   0 ], [  11,   7,   0 ],
-    // blue inverted
-    [   0,   0, 255 ], [  11,  11, 239 ], [  19,  19, 223 ], [  27,  27, 207 ], [  35,  35, 191 ], [  43,  43, 175 ], [  47,  47, 159 ], [  47,  47, 143 ], [  47,  47, 127 ], [  47,  47, 111 ], [  47,  47,  95 ], [  43,  43,  79 ], [  35,  35,  63 ], [  27,  27,  47 ], [  19,  19,  31 ], [  11,  11,  15 ],
-    // WHIIIIIIIIIITE ( supposed to be fire ??? )
-    [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ], [ 255, 255, 255 ],
-    // brights ( seems incorrect )
-    [ 255, 255, 255 ], [ 255, 255, 255 ], [ 199, 195,  55 ], [ 231, 227,  87 ], [ 127, 191, 255 ], [ 171, 231, 255 ], [ 215, 255, 255 ], [ 103,   0,   0 ], [ 139,   0,   0 ], [ 179,   0,   0 ], [ 215,   0,   0 ], [ 255,   0,   0 ], [ 255, 243, 147 ], [ 255, 247, 199 ], [ 255, 255, 255 ], [ 159,  91,  83 ]
-  ];
+  parser.parseDirectory( );
+  return parser;
 }
 
 function parseQuakeMapLine( line ) {
@@ -231,10 +80,13 @@ function computeIntersection( p0, p1, p2 ) {
 }
 
 function isPointInsideBrush( point, planes ) {
-  for ( const plane of planes ) {
-    if ( plane.distanceToPoint( point ) < -0.001 ) {
-      return false;
-    }
+  for ( let p_idx = 0; p_idx < planes.length; ++p_idx ) {
+    const plane = planes[ p_idx ];
+
+    if ( plane.distanceToPoint( point ) >= -0.001 )
+      continue;
+
+    return false;
   }
 
   return true;
@@ -275,47 +127,33 @@ function getFacePolygon( plane, verts ) {
 }
 
 function computeUVForVertex( vertex, line_data, texture ) {
-  if ( line_data.type === "VALVE" ) {
-    const u_vec = new THREE.Vector3( line_data.u.x, line_data.u.y, line_data.u.z );
-    const v_vec = new THREE.Vector3( line_data.v.x, line_data.v.y, line_data.v.z )
-    // vivek ramaswamy mentioned ??
-
-    const angle = THREE.MathUtils.degToRad( line_data.rotation );
-
-    const cos = Math.cos( angle );
-    const sin = Math.sin( angle );
-
-    const rotated_u = u_vec.clone( ).multiplyScalar( cos ).add( v_vec.clone( ).multiplyScalar( -sin ) );
-    const rotated_v = u_vec.clone( ).multiplyScalar( sin ).add( v_vec.clone( ).multiplyScalar(  cos ) );
-    
-    const u = vertex.dot( rotated_u ) + line_data.u.w;
-    const v = vertex.dot( rotated_v ) + line_data.v.w;
-
-    return new THREE.Vector2(
-      u / texture.image.width,
-      v / texture.image.height
-    );
-  }
-  
-  const normal = line_data.plane.normal;
-  let tangent = new THREE.Vector3( 0, 1, 0 );
-  
-  if ( Math.abs( normal.dot( tangent ) ) > 0.99 )
-    tangent.set( 1, 0, 0 );
-  
-  const u_axis = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
-  const v_axis = new THREE.Vector3( ).crossVectors( normal, u_axis ).normalize( );
-
   const angle = THREE.MathUtils.degToRad( line_data.rotation );
-
   const cos = Math.cos( angle );
   const sin = Math.sin( angle );
 
-  const rotated_u = u_axis.clone( ).multiplyScalar( cos ).add( v_axis.clone( ).multiplyScalar( -sin ) );
-  const rotated_v = u_axis.clone( ).multiplyScalar( sin ).add( v_axis.clone( ).multiplyScalar(  cos ) );
+  // vivek ramaswamy mentioned ??
+  let u_vec,  v_vec, uv_offset;
+  if ( line_data.type === "VALVE" ) {
+    u_vec = new THREE.Vector3( line_data.u.x, line_data.u.y, line_data.u.z );
+    v_vec = new THREE.Vector3( line_data.v.x, line_data.v.y, line_data.v.z )
+    uv_offset = new THREE.Vector2( line_data.u.w, line_data.v.w );
+  } else {
+    const normal = line_data.plane.normal;
+    let tangent = new THREE.Vector3( 0, 1, 0 );
+    
+    if ( Math.abs( normal.dot( tangent ) ) > 0.99 )
+      tangent.set( 1, 0, 0 );
 
-  const u = vertex.dot( rotated_u ) * line_data.uv_scale.x + line_data.uv_offset.x;
-  const v = vertex.dot( rotated_v ) * line_data.uv_scale.y + line_data.uv_offset.y;
+    u_vec = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
+    v_vec = new THREE.Vector3( ).crossVectors( normal, u_vec ).normalize( );
+    uv_offset = line_data.uv_offset;
+  }
+
+  const rotated_u = u_vec.clone( ).multiplyScalar( cos ).add( v_vec.clone( ).multiplyScalar( -sin ) );
+  const rotated_v = u_vec.clone( ).multiplyScalar( sin ).add( v_vec.clone( ).multiplyScalar(  cos ) );
+
+  const u = vertex.dot( rotated_u ) * ( 1 / line_data.uv_scale.x ) + uv_offset.x;
+  const v = vertex.dot( rotated_v ) * ( 1 / line_data.uv_scale.y ) + uv_offset.y;
   
   return new THREE.Vector2(
     u / texture.image.width,
@@ -326,6 +164,7 @@ function computeUVForVertex( vertex, line_data, texture ) {
 function createFaceGeometry( verts, face_data, texture ) {
   const normal = face_data.plane.normal;
 
+  // todo: make this a function, it's used more than once
   let tangent = new THREE.Vector3( 0, 1, 0 );
 
   if ( Math.abs( normal.dot( tangent ) ) > 0.99 )
@@ -333,6 +172,7 @@ function createFaceGeometry( verts, face_data, texture ) {
 
   const u_axis = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
   const v_axis = new THREE.Vector3( ).crossVectors( normal, u_axis ).normalize( );
+  // end func move
   
   const verts_2d = verts.map( v => new THREE.Vector2( v.dot( u_axis ), v.dot( v_axis ) ) );
   const triangles = THREE.ShapeUtils.triangulateShape( verts_2d, [ ] );
@@ -340,14 +180,21 @@ function createFaceGeometry( verts, face_data, texture ) {
   const uvs = [ ];
   const positions = [ ];
   
-  verts.forEach( v => {
-    const uv = computeUVForVertex( v, face_data, texture );
-    positions.push( v.x, v.y, v.z );
+  for ( let v_idx = 0; v_idx < verts.length; ++v_idx ) {
+    const vert = verts[ v_idx ];
+
+    const uv = computeUVForVertex( vert, face_data, texture );
+
+    positions.push( vert.x, vert.y, vert.z );
     uvs.push( uv.x, uv.y );
-  });
+  }
   
   const indices = [ ];
-  triangles.forEach( tri => indices.push( tri[0], tri[1], tri[2] ) );
+  for ( let t_idx = 0; t_idx < triangles.length; ++t_idx ) {
+    const tri = triangles[ t_idx ];
+    
+    indices.push( tri[0], tri[1], tri[2] );
+  }
   
   const geometry = new THREE.BufferGeometry( );
   geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
@@ -390,17 +237,11 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
 
   ctx.putImageData( img_data, 0, 0 );
 
-  const cdiv = document.createElement( "div" );  
-  cdiv.style.backgroundColor = "transparent";
-  cdiv.style.justifyContent = "center";
-  cdiv.style.flexDirection = "column";
-  cdiv.style.alignItems = "center";
-  cdiv.style.display = "flex";
-  cdiv.style.margin = "5px";
-  cdiv.style.color = "#777";
-
-  cdiv.id = name;
+  const cdiv = document.createElement( "div" );
+  cdiv.classList.add( 'texture_showcase' );
   cdiv.innerText = name;
+  cdiv.id = name;
+
   cdiv.appendChild( canvas );
   tex_showcase.appendChild( cdiv );
   
@@ -409,9 +250,8 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   texture.minFilter = THREE.NearestFilter;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.flipY = false;
-  
   texture.needsUpdate = true;
+  texture.flipY = false;
 
   return texture;
 }
@@ -440,7 +280,8 @@ function sortDomChildrenById( id ) {
     return 0;
   });
 
-  elements.forEach( el => container.appendChild( el ) );
+  for ( let e_idx = 0; e_idx < elements.length; ++e_idx )
+    container.appendChild( elements[ e_idx ] );
 }
 
 function parseMap( is_valve_fmt, map_data, wad ) {
@@ -454,11 +295,15 @@ function parseMap( is_valve_fmt, map_data, wad ) {
                     .filter( b => b.length );
 
   let spawn_found = false;
-  for ( const block of blocks ) {
+  for ( let b_idx = 0; b_idx < blocks.length; ++b_idx ) {
+    const block = blocks[ b_idx ];
+
     const lines = block.split( "\n" ).map( l => l.trim( ) ).filter( l => l.length );
 
     const face_data = [ ];
-    for ( const line of lines ) {
+    for ( let l_idx = 0; l_idx < lines.length; ++l_idx ) {
+      const line = lines[ l_idx ];
+
       if ( !spawn_found && line.startsWith( "\"origin\"" ) ) {
         const is_spawn = block.includes( "info_player_deathmatch" )
                       || block.includes( "info_player_start" );
@@ -507,7 +352,10 @@ function parseMap( is_valve_fmt, map_data, wad ) {
         for ( let z = y + 1; z < planes.length; ++z ) {
           const pt = computeIntersection( planes[ x ], planes[ y ], planes[ z ] );
 
-          if ( !pt || !isPointInsideBrush( pt, planes ) )
+          if ( !pt )
+            continue;
+
+          if ( !isPointInsideBrush( pt, planes ) )
             continue;
 
           if ( vertices.some( v => v.distanceToSquared( pt ) < FLT_EPSILON ) )
@@ -526,7 +374,9 @@ function parseMap( is_valve_fmt, map_data, wad ) {
     const brushes = new THREE.Group( );
 
     let unique_textures = new Set( );
-    for ( const fd of face_data ) {
+    for ( let f_idx = 0; f_idx < face_data.length; ++f_idx ) {
+      const fd = face_data[ f_idx ];
+
       const face_verts = getFacePolygon( fd.plane, vertices );
 
       if ( !face_verts || face_verts.length < 3 ) {
@@ -579,69 +429,83 @@ function setHudNames( m, w ) {
 function extractFirstWadName( map_data ) {
   const wad_regex = /^"wad"\s*"([^";]+?\.wad)(?=;|")/;
 
-  const blocks = map_data.split( "}" ).join( "" )
-                         .split( "{" )
-                         .map( b => b.trim( ) )
-                         .filter( b => b.length );
+  const lines = map_data.split( "\n" )
+                        .map( l => l.trim( ) )
+                        .filter( l => l.length );
 
-  for ( const block of blocks ) {
-    const lines = block.split( "\n" ).map( l => l.trim( ) ).filter( l => l.length );
+  for ( let l_idx = 0; l_idx < lines.length; ++l_idx ) {
+    const line = lines[ l_idx ];
 
-    for ( const line of lines ) {
-      if ( !line.startsWith( "\"wad\"" ) )
-        continue;
+    if ( !line.startsWith( "\"wad\"" ) )
+      continue;
 
-      const match = line.match( wad_regex );
-      
-      if ( !match )
-        continue;
+    const match = line.match( wad_regex );
+    
+    if ( !match )
+      continue;
 
-      return match[ 1 ];
-    }
+    return match[ 1 ];
   }
 
   return null;
 }
 
 async function loadDefaultMap( map ) {
+  let ret = true;
+
   try {
     const map_data = await fetch( map ).then( res => res.text( ) );
-    const valve_map = map_data.includes( "[" ) || map_data.includes( "]" );
+
     const wad_name = extractFirstWadName( map_data );
 
     if ( !wad_name )
       throw new Error( `failed to find wad in ${ map }` );
 
     const wad_data = await fetch( wad_name ).then( res => res.arrayBuffer( ) );
-    const wad = loadWad( wad_data );
 
-    if ( parseMap( valve_map, map_data, wad ) )
-      setHudNames( map, wad_name );
+    if ( loadMap( map_data, wad_data ) ) {
+      setHudNames(
+        map.split( "/" ).slice( -1 )[ 0 ],
+        wad_name.split( "/" ).slice( -1 )[ 0 ]
+      );
+    }
+    else
+      ret = false;
   } catch ( err ) {
     console.error( "failed to load default map:", err );
-    return false;
+    ret = false;
   }
 
-  return true;
+  hideProgress( );
+  return ret;
+}
+
+function loadMap( map_data, wad_data ) {
+  const valve_map = map_data.includes( "[" ) || map_data.includes( "]" );
+  
+  const wad = loadWad( wad_data );
+
+  if ( parseMap( valve_map, map_data, wad ) )
+    return true;
+  else
+    return false;
 }
 
 let cam;
-let scene;
 let renderer;
 let controls;
-async function init( ) {
-  setProgress( 0 );
+const scene = new THREE.Scene( );
 
+async function init( ) {
   if ( !WebGL.isWebGL2Available( ) )
     return false;
-
-  setProgress( 5 );
 
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  scene = new THREE.Scene( );
   renderer = new THREE.WebGLRenderer( );
+  document.body.appendChild( renderer.domElement );
+
   cam = new THREE.PerspectiveCamera( 69, w / h, 0.1, 2000 );
   
   controls = new FlyControls( cam, renderer.domElement );
@@ -649,11 +513,8 @@ async function init( ) {
   cam.position.set( 0, 0, 0 );
   renderer.setSize( w, h );
   
-  document.body.appendChild( renderer.domElement );
-  
-  // this may be wrong for mobile
   controls.dragToLook = ( w > h );
-  controls.movementSpeed = 300;
+  controls.movementSpeed = 100;
   controls.rollSpeed = 0.5;
 
   return await loadDefaultMap( "files/valve/c1a0.map" );
@@ -661,9 +522,7 @@ async function init( ) {
 
 function render( ) {
   requestAnimationFrame( render );
-
-  controls.update( 0.016 ); // 1 / 60
-
+  controls.update( UPDATE_TIME );
   renderer.render( scene, cam );
 }
 
@@ -695,15 +554,6 @@ function toggleBottomCollapsibleSection( e ) {
   btn.style.bottom = ( !btn.classList.contains( 'active' ) ) ? "8px" : "136px";
 }
 
-function toggleWireframe( e ) {
-  scene.traverse( c => {
-    if ( c.isMesh && c.material ) {
-      c.material.wireframe = !c.material.wireframe;
-      c.material.needsUpdate = true;
-    }
-  });
-}
-
 let prev_map_selection = null;
 function selectChangeMap( e ) {
   const tex_showcase = document.getElementById( 'side_collapsible_section' );
@@ -720,6 +570,75 @@ function selectChangeMap( e ) {
   tex_showcase.innerHTML = "";
   prev_map_selection = e.target.value;
   Promise.resolve( loadDefaultMap( e.target.value ) );
+}
+
+function toggleWireframe( e ) {
+  scene.traverse( c => {
+    if ( c.isMesh && c.material ) {
+      c.material.wireframe = !c.material.wireframe;
+      c.material.needsUpdate = true;
+    }
+  });
+}
+
+function mapFileChange( e ) {
+  const tex_showcase = document.getElementById( 'side_collapsible_section' );
+  const cb = document.getElementById( 'wireframe' );
+  const files = e.target.files;
+
+  let map_found = false;
+  for ( let f_idx = 0; f_idx < files.length; ++f_idx ) {
+    const file = files[ f_idx ];
+
+    if ( file.size === 0 )
+      continue;
+    
+    if ( !file.name.endsWith( ".map" ) )
+      continue;
+
+    map_found = true;
+    break;
+  }
+
+  if ( !map_found )
+    throw new Error( "no map found" );
+
+  // set select element w/ id map_picker to option 'File Upload'
+
+  // validate wad in map data
+  //  if wad is not uploaded, throw error & wait for wadFileChange
+  //  if wad is uploaded, continue
+  
+  // copy selectChangeMap here
+}
+
+function wadFileChange( e ) {
+  const tex_showcase = document.getElementById( 'side_collapsible_section' );
+  const cb = document.getElementById( 'wireframe' );
+  const files = e.target.files;
+
+  let wad_found = false;
+  for ( let f_idx = 0; f_idx < files.length; ++f_idx ) {
+    const file = files[ f_idx ];
+
+    if ( file.size === 0 )
+      continue;
+    
+    if ( !file.name.endsWith( ".map" ) )
+      continue;
+
+    wad_found = true;
+    break;
+  }
+
+  if ( !wad_found )
+    throw new Error( "no wad found" );
+
+  // validate this is the correct wad with map data
+  //  if map is not uploaded&matched, throw error & wait for mapFileChange
+  //  if map is uploaded, continue
+  
+  // copy selectChangeMap here
 }
 
 function hideProgress( ) {
@@ -740,26 +659,31 @@ function setProgress( val ) {
   if ( typeof val !== "number" )
     return;
 
-  if ( progress.style.display === "none" )
-    progress.style.display = "block";
-
+  progress.style.display = "block";
   progress.value = val;
 }
 
 document.addEventListener( "DOMContentLoaded", ( ) => {
+  setProgress( 0 );
+
   document.getElementById( 'bottom_collapsible_btn' ).onclick = toggleBottomCollapsibleSection;
   document.getElementById( 'side_collapsible_btn' ).onclick = toggleSideCollapsibleSection;
   document.getElementById( 'map_picker' ).onchange = selectChangeMap;
   document.getElementById( 'wireframe' ).onclick = toggleWireframe;
-
-  // add upload map and wad events to parse shi 
+  document.getElementById( 'map' ).onchange = mapFileChange;
+  document.getElementById( 'wad' ).onchange = wadFileChange;
 });
 
 onkeyup = ( e ) => {
   const cb = document.getElementById( 'wireframe' );
 
-  if ( e.key === 'x' )
-    cb.click( );
+  if ( !cb )
+    return;
+
+  if ( e.key !== 'x' )
+    return;
+
+  cb.click( );
 };
 
 onkeydown = ( e ) => {
@@ -768,8 +692,10 @@ onkeydown = ( e ) => {
   if ( !select )
     return;
 
-  if ( e.target === select )
-    e.preventDefault( );
+  if ( e.target !== select )
+    return;
+
+  e.preventDefault( );
 };
 
 onresize = ( ) => {
