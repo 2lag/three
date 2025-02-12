@@ -1,6 +1,11 @@
 ### todo
- - clean main.js -- its a mess ( split up the functionality as much as possible even more )
+ - clean main.js
+   - optimize createFaceGeometry ( this is hottest path rn outside of frames )
+   - clean / optimize parseMap ( seeing some ez functions to make: i.e. setCamPos( ) )
    - make sure all throws are handled globally
+   - remove all regex ( search for '.match' & '/;' )
+   - optimize loops
+   - optimize rendering method ( current way is not efficient for threejs standards )
 
  - get map loading from file upload
    - if uploaded/current wad name does not match the one in the map settings/entity, error out w/ on screen message ( clear on matching wad load ) and dont load until it does ( split by '/' if in string and get last since we just want file name )
@@ -20,7 +25,7 @@
    - make it animated
 
  - make loading/parsing & running faster
-   - more async & use 0 regex
+   - more async
    - profile site reload & usage with firefox shits ( ff dev edition go crazy ( shill in the readme history is crazy but valid ) )
 
  - find / make better movement controller

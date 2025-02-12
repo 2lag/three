@@ -62,6 +62,9 @@ function parseValveMapLine( line ) {
   };
 }
 
+const term0 = new THREE.Vector3( );
+const term1 = new THREE.Vector3( );
+const term2 = new THREE.Vector3( );
 function computeIntersection( p0, p1, p2 ) {
   const n0 = p0.normal;
   const n1 = p1.normal;
@@ -72,9 +75,9 @@ function computeIntersection( p0, p1, p2 ) {
   if ( Math.abs( denominator ) < FLT_EPSILON )
     return null;
 
-  const term0 = new THREE.Vector3( ).crossVectors( n1, n2 ).multiplyScalar( -p0.constant );
-  const term1 = new THREE.Vector3( ).crossVectors( n2, n0 ).multiplyScalar( -p1.constant );
-  const term2 = new THREE.Vector3( ).crossVectors( n0, n1 ).multiplyScalar( -p2.constant );
+  term0.crossVectors( n1, n2 ).multiplyScalar( -p0.constant );
+  term1.crossVectors( n2, n0 ).multiplyScalar( -p1.constant );
+  term2.crossVectors( n0, n1 ).multiplyScalar( -p2.constant );
 
   return new THREE.Vector3( ).addVectors( term0 , term1 ).add( term2 ).divideScalar( denominator );
 }
@@ -100,6 +103,7 @@ function getFacePolygon( plane, verts ) {
   if ( face_verts.length < 3 )
     return null;
 
+  // this part goes function where the other one was commented
   const normal = plane.normal;
   let tangent = new THREE.Vector3( 0, 1, 0 );
 
@@ -108,6 +112,7 @@ function getFacePolygon( plane, verts ) {
 
   const u_axis = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
   const v_axis = new THREE.Vector3( ).crossVectors( normal, u_axis  ).normalize( );
+  // end func part
   
   let center = new THREE.Vector2( 0, 0 );
   const face_verts_2d = face_verts.map( v => {
@@ -205,9 +210,9 @@ function createFaceGeometry( verts, face_data, texture ) {
   return geometry;
 }
 
+const quake_palette = getQuakePalette( );
 function createTextureFromMip( mip_tex, is_valve_fmt ) {
-  const tex_showcase = document.getElementById( 'side_collapsible_section' );
-  const palette = ( is_valve_fmt ) ? mip_tex.palette : getQuakePalette( );
+  const palette = ( is_valve_fmt ) ? mip_tex.palette : quake_palette;
   const { name, width, height, data } = mip_tex;
 
   const canvas = document.createElement( "canvas" );
@@ -243,7 +248,7 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   cdiv.id = name;
 
   cdiv.appendChild( canvas );
-  tex_showcase.appendChild( cdiv );
+  texture_showcase.appendChild( cdiv );
   
   const texture = new THREE.Texture( canvas );
   texture.magFilter = THREE.NearestFilter;
@@ -256,13 +261,11 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   return texture;
 }
 
-function sortDomChildrenById( id ) {
-  const container = document.getElementById( id );
-
-  if ( !container )
+function sortTexturesById( ) {
+  if ( !texture_showcase )
     return;
 
-  const elements = Array.from( container.children );
+  const elements = Array.from( texture_showcase.children );
 
   if ( !elements )
     return;
@@ -281,12 +284,14 @@ function sortDomChildrenById( id ) {
   });
 
   for ( let e_idx = 0; e_idx < elements.length; ++e_idx )
-    container.appendChild( elements[ e_idx ] );
+    texture_showcase.appendChild( elements[ e_idx ] );
 }
 
 function parseMap( is_valve_fmt, map_data, wad ) {
   const origin_regex = /"origin"\s*"(-?\d+)\s+(-?\d+)\s+(-?\d+)"/;
   const map = new THREE.Group( );
+
+  let unique_textures = new Set( );
   let texture_list = new Map( );
 
   const blocks = map_data.split( "}" ).join( "" )
@@ -310,14 +315,13 @@ function parseMap( is_valve_fmt, map_data, wad ) {
         const match = line.match( origin_regex );
 
         if ( match && is_spawn ) {
-          const origin = new THREE.Vector3(
+          cam.position.set(
             parseFloat( match[ 1 ] ),
             parseFloat( match[ 2 ] ),
             parseFloat( match[ 3 ] )
           );
 
           cam.rotation.set( 0, Math.PI * 0.5, Math.PI * 0.5 );
-          cam.position.set( origin.x, origin.y, origin.z );
           spawn_found = true;
         }
       }
@@ -332,7 +336,7 @@ function parseMap( is_valve_fmt, map_data, wad ) {
       if ( !line_data )
         continue;
 
-      line_data.plane = new THREE.Plane( ).setFromCoplanarPoints( line_data.v0, line_data.v1, line_data.v2 );;
+      line_data.plane = new THREE.Plane( ).setFromCoplanarPoints( line_data.v0, line_data.v1, line_data.v2 );
       face_data.push( line_data );
     }
 
@@ -373,7 +377,6 @@ function parseMap( is_valve_fmt, map_data, wad ) {
 
     const brushes = new THREE.Group( );
 
-    let unique_textures = new Set( );
     for ( let f_idx = 0; f_idx < face_data.length; ++f_idx ) {
       const fd = face_data[ f_idx ];
 
@@ -415,15 +418,18 @@ function parseMap( is_valve_fmt, map_data, wad ) {
     map.add( brushes );
   }
 
-  sortDomChildrenById( "side_collapsible_section" );
+  sortTexturesById( );
 
   scene.add( map );
   return true;
 }
 
 function setHudNames( m, w ) {
-  document.getElementById( 'map_name' ).innerText = m;
-  document.getElementById( 'wad_name' ).innerText = w;
+  if ( !map_name || !wad_name )
+    return;
+
+  map_name.innerText = m;
+  wad_name.innerText = w;
 }
 
 function extractFirstWadName( map_data ) {
@@ -482,13 +488,8 @@ async function loadDefaultMap( map ) {
 
 function loadMap( map_data, wad_data ) {
   const valve_map = map_data.includes( "[" ) || map_data.includes( "]" );
-  
   const wad = loadWad( wad_data );
-
-  if ( parseMap( valve_map, map_data, wad ) )
-    return true;
-  else
-    return false;
+  return parseMap( valve_map, map_data, wad );
 }
 
 let cam;
@@ -527,10 +528,9 @@ function render( ) {
 }
 
 function toggleSideCollapsibleSection( e ) {
-  const section = document.getElementById( 'side_collapsible_section' );
-  const btn = document.getElementById( 'side_collapsible_btn' );
+  const btn = e.target;
   
-  section.classList.toggle( 'active' );
+  texture_showcase.classList.toggle( 'active' );
   btn.classList.toggle( 'active' );
   
   btn.innerText = ( !btn.classList.contains( 'active' ) ) ? '+' : '-';
@@ -538,17 +538,18 @@ function toggleSideCollapsibleSection( e ) {
 }
 
 function toggleBottomCollapsibleSection( e ) {
-  const side_section = document.getElementById( 'side_collapsible_section' );
-  const section = document.getElementById( 'bottom_collapsible_section' );
-  const btn = document.getElementById( 'bottom_collapsible_btn' );
+  const btn = e.target;
+
+  if ( !settings )
+    return;
   
-  section.classList.toggle( 'active' );
+  settings.classList.toggle( 'active' );
   btn.classList.toggle( 'active' );
   
-  if ( section.classList.contains( 'active' ) )
-    side_section.style.height = "calc( 100% - 132px )";
+  if ( settings.classList.contains( 'active' ) )
+    texture_showcase.style.height = "calc( 100% - 132px )";
   else
-    side_section.style.height = "100%";
+    texture_showcase.style.height = "100%";
 
   btn.innerText = ( !btn.classList.contains( 'active' ) ) ? '+' : '-';
   btn.style.bottom = ( !btn.classList.contains( 'active' ) ) ? "8px" : "136px";
@@ -556,18 +557,16 @@ function toggleBottomCollapsibleSection( e ) {
 
 let prev_map_selection = null;
 function selectChangeMap( e ) {
-  const tex_showcase = document.getElementById( 'side_collapsible_section' );
-  const cb = document.getElementById( 'wireframe' );
   const selection = e.target.value;
 
   if ( selection === "File Upload" || selection === prev_map_selection )
     return;
 
-  if ( cb.checked )
-    cb.checked = false;
+  if ( wireframe_cb && wireframe_cb.checked )
+    wireframe_cb.checked = false;
 
   scene.clear( );
-  tex_showcase.innerHTML = "";
+  texture_showcase.innerHTML = "";
   prev_map_selection = e.target.value;
   Promise.resolve( loadDefaultMap( e.target.value ) );
 }
@@ -582,8 +581,6 @@ function toggleWireframe( e ) {
 }
 
 function mapFileChange( e ) {
-  const tex_showcase = document.getElementById( 'side_collapsible_section' );
-  const cb = document.getElementById( 'wireframe' );
   const files = e.target.files;
 
   let map_found = false;
@@ -609,12 +606,12 @@ function mapFileChange( e ) {
   //  if wad is not uploaded, throw error & wait for wadFileChange
   //  if wad is uploaded, continue
   
+  // make sure to set wireframe_cb.checked to false
+  
   // copy selectChangeMap here
 }
 
 function wadFileChange( e ) {
-  const tex_showcase = document.getElementById( 'side_collapsible_section' );
-  const cb = document.getElementById( 'wireframe' );
   const files = e.target.files;
 
   let wad_found = false;
@@ -624,7 +621,7 @@ function wadFileChange( e ) {
     if ( file.size === 0 )
       continue;
     
-    if ( !file.name.endsWith( ".map" ) )
+    if ( !file.name.endsWith( ".wad" ) )
       continue;
 
     wad_found = true;
@@ -638,12 +635,12 @@ function wadFileChange( e ) {
   //  if map is not uploaded&matched, throw error & wait for mapFileChange
   //  if map is uploaded, continue
   
+  // make sure to set wireframe_cb.checked to false
+
   // copy selectChangeMap here
 }
 
 function hideProgress( ) {
-  const progress = document.getElementById( 'progress' );
-
   if ( !progress )
     return;
 
@@ -651,8 +648,6 @@ function hideProgress( ) {
 }
 
 function setProgress( val ) {
-  const progress = document.getElementById( 'progress' );
-
   if ( !progress )
     return;
 
@@ -663,36 +658,42 @@ function setProgress( val ) {
   progress.value = val;
 }
 
+let texture_showcase, settings, wireframe_cb, map_picker, progress, map_name, wad_name;
 document.addEventListener( "DOMContentLoaded", ( ) => {
   setProgress( 0 );
 
+  texture_showcase = document.getElementById( 'side_collapsible_section' );
+  settings = document.getElementById( 'bottom_collapsible_section' );
+  wireframe_cb = document.getElementById( 'wireframe' );
+  map_picker = document.getElementById( 'map_picker' );
+  progress = document.getElementById( 'progress' );
+  map_name = document.getElementById( 'map_name' );
+  wad_name = document.getElementById( 'wad_name' );
+
   document.getElementById( 'bottom_collapsible_btn' ).onclick = toggleBottomCollapsibleSection;
   document.getElementById( 'side_collapsible_btn' ).onclick = toggleSideCollapsibleSection;
-  document.getElementById( 'map_picker' ).onchange = selectChangeMap;
-  document.getElementById( 'wireframe' ).onclick = toggleWireframe;
   document.getElementById( 'map' ).onchange = mapFileChange;
   document.getElementById( 'wad' ).onchange = wadFileChange;
+  
+  wireframe_cb.onclick = toggleWireframe;
+  map_picker.onchange = selectChangeMap;
 });
 
 onkeyup = ( e ) => {
-  const cb = document.getElementById( 'wireframe' );
-
-  if ( !cb )
+  if ( !wireframe_cb )
     return;
 
   if ( e.key !== 'x' )
     return;
 
-  cb.click( );
+  wireframe_cb.click( );
 };
 
 onkeydown = ( e ) => {
-  const select = document.getElementById( 'map_picker' );
-  
-  if ( !select )
+  if ( !map_picker )
     return;
 
-  if ( e.target !== select )
+  if ( e.target !== map_picker )
     return;
 
   e.preventDefault( );
