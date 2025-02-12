@@ -2,7 +2,12 @@
   font-family: DOS;
   src: url( './Web437_DOS-V_re_ANK24.woff' );
 }
-* { font-family: DOS; }
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  font-family: DOS;
+}
 
 :root {
   --height-slide: height 0.1s ease-in-out;
@@ -137,3 +142,8 @@ label, select,
 
 #fps > div { position: relative !important; }
 #tagline > a { color: #999; }
+
+#wireframe {
+  accent-color: #333;
+  filter: invert( );
+}

@@ -7,7 +7,8 @@ import { FlyControls } from 'three/addons/controls/FlyControls.js';
 import { getQuakePalette } from './js/static.js'
 import WadParser from './js/WadParser.js';
 
-const UPDATE_TIME = 1 / 60;
+const HALF_PI = Math.PI / 2;
+const UPDATE_TIME = 1 / 30;
 const FLT_EPSILON = 1e-6;
 
 function loadWad( wad_data ) {
@@ -23,9 +24,9 @@ function loadWad( wad_data ) {
   return parser;
 }
 
+const quake_line_regex = /^\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s+(\S+)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/;
 function parseQuakeMapLine( line ) {
-  const regex = /^\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s+(\S+)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/;
-  const match = line.match( regex );
+  const match = line.match( quake_line_regex );
 
   if ( !match )
     return null;
@@ -42,9 +43,9 @@ function parseQuakeMapLine( line ) {
   };
 }
 
+const valve_line_regex = /^\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s+(\S+)\s+\[\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+\]\s+\[\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+\]\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/;
 function parseValveMapLine( line ) {
-  const regex = /^\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s+(\S+)\s+\[\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+\]\s+\[\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+\]\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/;
-  const match = line.match( regex );
+  const match = line.match( valve_line_regex );
 
   if ( !match )
     return null;
@@ -95,6 +96,16 @@ function isPointInsideBrush( point, planes ) {
   return true;
 }
 
+let u_vec3 = new THREE.Vector3( );
+let v_vec3 = new THREE.Vector3( ); // vivek ramaswamy mentioned ??
+const tan010 = new THREE.Vector3( 0, 1, 0 );
+const tan100 = new THREE.Vector3( 1, 0, 0 );
+function getUVAxis( normal ) {
+  let tangent = ( Math.abs( normal.dot( tan010 ) ) > 0.99 ) ? tan100 : tan010;
+  u_vec3.crossVectors( normal, tangent ).normalize( );
+  v_vec3.crossVectors( normal, u_vec3  ).normalize( );
+}
+
 function getFacePolygon( plane, verts ) {
   const tol = 0.001;
 
@@ -103,28 +114,19 @@ function getFacePolygon( plane, verts ) {
   if ( face_verts.length < 3 )
     return null;
 
-  // this part goes function where the other one was commented
-  const normal = plane.normal;
-  let tangent = new THREE.Vector3( 0, 1, 0 );
-
-  if ( Math.abs( normal.dot( tangent ) ) > 0.99 )
-    tangent.set( 1, 0, 0 );
-
-  const u_axis = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
-  const v_axis = new THREE.Vector3( ).crossVectors( normal, u_axis  ).normalize( );
-  // end func part
+  getUVAxis( plane.normal );
   
   let center = new THREE.Vector2( 0, 0 );
   const face_verts_2d = face_verts.map( v => {
-    return new THREE.Vector2( v.dot( u_axis ), v.dot( v_axis ) );
+    return new THREE.Vector2( v.dot( u_vec3 ), v.dot( v_vec3 ) );
   });
 
   face_verts_2d.forEach( p => center.add( p ) );
   center.divideScalar( face_verts_2d.length );
 
   face_verts.sort( ( a, b ) => {
-    const pa = new THREE.Vector2( a.dot( u_axis ), a.dot( v_axis ) ).sub( center );
-    const pb = new THREE.Vector2( b.dot( u_axis ), b.dot( v_axis ) ).sub( center );
+    const pa = new THREE.Vector2( a.dot( u_vec3 ), a.dot( v_vec3 ) ).sub( center );
+    const pb = new THREE.Vector2( b.dot( u_vec3 ), b.dot( v_vec3 ) ).sub( center );
     return Math.atan2( pa.y, pa.x ) - Math.atan2( pb.y, pb.x );
   });
 
@@ -136,26 +138,18 @@ function computeUVForVertex( vertex, line_data, texture ) {
   const cos = Math.cos( angle );
   const sin = Math.sin( angle );
 
-  // vivek ramaswamy mentioned ??
-  let u_vec,  v_vec, uv_offset;
+  let uv_offset;
   if ( line_data.type === "VALVE" ) {
-    u_vec = new THREE.Vector3( line_data.u.x, line_data.u.y, line_data.u.z );
-    v_vec = new THREE.Vector3( line_data.v.x, line_data.v.y, line_data.v.z )
+    u_vec3.set( line_data.u.x, line_data.u.y, line_data.u.z );
+    v_vec3.set( line_data.v.x, line_data.v.y, line_data.v.z );
     uv_offset = new THREE.Vector2( line_data.u.w, line_data.v.w );
   } else {
-    const normal = line_data.plane.normal;
-    let tangent = new THREE.Vector3( 0, 1, 0 );
-    
-    if ( Math.abs( normal.dot( tangent ) ) > 0.99 )
-      tangent.set( 1, 0, 0 );
-
-    u_vec = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
-    v_vec = new THREE.Vector3( ).crossVectors( normal, u_vec ).normalize( );
+    getUVAxis( line_data.plane.normal );
     uv_offset = line_data.uv_offset;
   }
 
-  const rotated_u = u_vec.clone( ).multiplyScalar( cos ).add( v_vec.clone( ).multiplyScalar( -sin ) );
-  const rotated_v = u_vec.clone( ).multiplyScalar( sin ).add( v_vec.clone( ).multiplyScalar(  cos ) );
+  const rotated_u = u_vec3.clone( ).multiplyScalar( cos ).add( v_vec3.clone( ).multiplyScalar( -sin ) );
+  const rotated_v = u_vec3.clone( ).multiplyScalar( sin ).add( v_vec3.clone( ).multiplyScalar(  cos ) );
 
   const u = vertex.dot( rotated_u ) * ( 1 / line_data.uv_scale.x ) + uv_offset.x;
   const v = vertex.dot( rotated_v ) * ( 1 / line_data.uv_scale.y ) + uv_offset.y;
@@ -167,19 +161,9 @@ function computeUVForVertex( vertex, line_data, texture ) {
 }
 
 function createFaceGeometry( verts, face_data, texture ) {
-  const normal = face_data.plane.normal;
-
-  // todo: make this a function, it's used more than once
-  let tangent = new THREE.Vector3( 0, 1, 0 );
-
-  if ( Math.abs( normal.dot( tangent ) ) > 0.99 )
-    tangent.set( 1, 0, 0 );
-
-  const u_axis = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
-  const v_axis = new THREE.Vector3( ).crossVectors( normal, u_axis ).normalize( );
-  // end func move
+  getUVAxis( face_data.plane.normal );
   
-  const verts_2d = verts.map( v => new THREE.Vector2( v.dot( u_axis ), v.dot( v_axis ) ) );
+  const verts_2d = verts.map( v => new THREE.Vector2( v.dot( u_vec3 ), v.dot( v_vec3 ) ) );
   const triangles = THREE.ShapeUtils.triangulateShape( verts_2d, [ ] );
 
   const uvs = [ ];
@@ -287,8 +271,13 @@ function sortTexturesById( ) {
     texture_showcase.appendChild( elements[ e_idx ] );
 }
 
+function setCamPos( x, y, z ) {
+  cam.rotation.set( 0, HALF_PI, HALF_PI );
+  cam.position.set( x, y, z );
+}
+
+const origin_regex = /"origin"\s*"(-?\d+)\s+(-?\d+)\s+(-?\d+)"/;
 function parseMap( is_valve_fmt, map_data, wad ) {
-  const origin_regex = /"origin"\s*"(-?\d+)\s+(-?\d+)\s+(-?\d+)"/;
   const map = new THREE.Group( );
 
   let unique_textures = new Set( );
@@ -302,26 +291,26 @@ function parseMap( is_valve_fmt, map_data, wad ) {
   let spawn_found = false;
   for ( let b_idx = 0; b_idx < blocks.length; ++b_idx ) {
     const block = blocks[ b_idx ];
-
-    const lines = block.split( "\n" ).map( l => l.trim( ) ).filter( l => l.length );
-
     const face_data = [ ];
+
+    const lines = block.split( "\n" )
+                       .map( l => l.trim( ) )
+                       .filter( l => l.length );
+
     for ( let l_idx = 0; l_idx < lines.length; ++l_idx ) {
       const line = lines[ l_idx ];
 
-      if ( !spawn_found && line.startsWith( "\"origin\"" ) ) {
+      if ( !spawn_found && line.startsWith( '"origin"' ) ) {
         const is_spawn = block.includes( "info_player_deathmatch" )
                       || block.includes( "info_player_start" );
         const match = line.match( origin_regex );
 
         if ( match && is_spawn ) {
-          cam.position.set(
+          setCamPos(
             parseFloat( match[ 1 ] ),
             parseFloat( match[ 2 ] ),
             parseFloat( match[ 3 ] )
           );
-
-          cam.rotation.set( 0, Math.PI * 0.5, Math.PI * 0.5 );
           spawn_found = true;
         }
       }
@@ -419,7 +408,6 @@ function parseMap( is_valve_fmt, map_data, wad ) {
   }
 
   sortTexturesById( );
-
   scene.add( map );
   return true;
 }
@@ -432,9 +420,8 @@ function setHudNames( m, w ) {
   wad_name.innerText = w;
 }
 
+const wad_regex = /^"wad"\s*"([^";]+?\.wad)(?=;|")/;
 function extractFirstWadName( map_data ) {
-  const wad_regex = /^"wad"\s*"([^";]+?\.wad)(?=;|")/;
-
   const lines = map_data.split( "\n" )
                         .map( l => l.trim( ) )
                         .filter( l => l.length );
@@ -442,7 +429,7 @@ function extractFirstWadName( map_data ) {
   for ( let l_idx = 0; l_idx < lines.length; ++l_idx ) {
     const line = lines[ l_idx ];
 
-    if ( !line.startsWith( "\"wad\"" ) )
+    if ( !line.startsWith( '"wad"' ) )
       continue;
 
     const match = line.match( wad_regex );
@@ -460,14 +447,16 @@ async function loadDefaultMap( map ) {
   let ret = true;
 
   try {
-    const map_data = await fetch( map ).then( res => res.text( ) );
+    const map_file = await fetch( map );
+    const map_data = await map_file.text( );
 
     const wad_name = extractFirstWadName( map_data );
 
     if ( !wad_name )
       throw new Error( `failed to find wad in ${ map }` );
 
-    const wad_data = await fetch( wad_name ).then( res => res.arrayBuffer( ) );
+    const wad_file = await fetch( wad_name );
+    const wad_data = await wad_file.arrayBuffer( );
 
     if ( loadMap( map_data, wad_data ) ) {
       setHudNames(
