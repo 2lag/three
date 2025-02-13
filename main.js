@@ -1,14 +1,12 @@
 import * as THREE from "three";
-
 import WebGL from 'three/addons/capabilities/WebGL.js';
-
 import { FlyControls } from 'three/addons/controls/FlyControls.js';
-
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { getQuakePalette } from './js/static.js'
 import WadParser from './js/WadParser.js';
 
 const HALF_PI = Math.PI / 2;
-const UPDATE_TIME = 1 / 30;
+const UPDATE_TIME = 1 / 60;
 const FLT_EPSILON = 1e-6;
 
 function loadWad( wad_data ) {
@@ -121,7 +119,9 @@ function getFacePolygon( plane, verts ) {
     return new THREE.Vector2( v.dot( u_vec3 ), v.dot( v_vec3 ) );
   });
 
-  face_verts_2d.forEach( p => center.add( p ) );
+  for ( let f_idx = 0; f_idx < face_verts_2d.length; ++f_idx )
+    center.add( face_verts_2d[ f_idx ] );
+
   center.divideScalar( face_verts_2d.length );
 
   face_verts.sort( ( a, b ) => {
@@ -276,43 +276,71 @@ function setCamPos( x, y, z ) {
   cam.position.set( x, y, z );
 }
 
+function computeBrushVertices( planes ) {
+  const len = planes.length;
+  const verts = [ ];
+
+  for ( let i0 = 0; i0 < len; ++i0 ) {
+    for ( let i1 = i0 + 1; i1 < len; ++i1 ) {
+      for ( let i2 = i1 + 1; i2 < len; ++i2 ) {
+        const pt = computeIntersection( planes[ i0 ], planes[ i1 ], planes[ i2 ] );
+
+        if ( !pt )
+          continue;
+
+        if ( !isPointInsideBrush( pt, planes ) )
+          continue;
+
+        if ( verts.some( v => v.distanceToSquared( pt ) < FLT_EPSILON ) )
+          continue;
+
+        verts.push( pt );
+      }
+    }
+  }
+
+  return verts;
+}
+
 const origin_regex = /"origin"\s*"(-?\d+)\s+(-?\d+)\s+(-?\d+)"/;
 function parseMap( is_valve_fmt, map_data, wad ) {
-  const map = new THREE.Group( );
-
   let unique_textures = new Set( );
+  const map = new THREE.Group( );
   let texture_list = new Map( );
+  let spawn_found = false;
 
   const blocks = map_data.split( "}" ).join( "" )
                     .split( "{" )
                     .map( b => b.trim( ) )
-                    .filter( b => b.length );
+                    .filter( b => b );
 
-  let spawn_found = false;
   for ( let b_idx = 0; b_idx < blocks.length; ++b_idx ) {
     const block = blocks[ b_idx ];
     const face_data = [ ];
 
     const lines = block.split( "\n" )
                        .map( l => l.trim( ) )
-                       .filter( l => l.length );
+                       .filter( l => l );
 
     for ( let l_idx = 0; l_idx < lines.length; ++l_idx ) {
       const line = lines[ l_idx ];
 
       if ( !spawn_found && line.startsWith( '"origin"' ) ) {
-        const is_spawn = block.includes( "info_player_deathmatch" )
-                      || block.includes( "info_player_start" );
+        if ( !block.includes( "info_player_deathmatch" ) && !block.includes( "info_player_start" ) )
+          continue;
+
         const match = line.match( origin_regex );
 
-        if ( match && is_spawn ) {
-          setCamPos(
-            parseFloat( match[ 1 ] ),
-            parseFloat( match[ 2 ] ),
-            parseFloat( match[ 3 ] )
-          );
-          spawn_found = true;
-        }
+        if ( !match )
+          continue;
+
+        spawn_found = true;
+
+        setCamPos(
+          parseFloat( match[ 1 ] ),
+          parseFloat( match[ 2 ] ),
+          parseFloat( match[ 3 ] )
+        );
       }
 
       if ( !line.startsWith( "(" ) )
@@ -337,27 +365,9 @@ function parseMap( is_valve_fmt, map_data, wad ) {
       continue;
     }
 
-    const vertices = [ ];
-    const planes = face_data.map( fd => fd.plane );
-
-    for ( let x = 0; x < planes.length; ++x ) {
-      for ( let y = x + 1; y < planes.length; ++y ) {
-        for ( let z = y + 1; z < planes.length; ++z ) {
-          const pt = computeIntersection( planes[ x ], planes[ y ], planes[ z ] );
-
-          if ( !pt )
-            continue;
-
-          if ( !isPointInsideBrush( pt, planes ) )
-            continue;
-
-          if ( vertices.some( v => v.distanceToSquared( pt ) < FLT_EPSILON ) )
-            continue;
-
-          vertices.push( pt );
-        }
-      }
-    }
+    const vertices = computeBrushVertices(
+      face_data.map( fd => fd.plane )
+    );
 
     if ( !vertices.length ) {
       console.error( "no vertices computed for brush" );
@@ -365,6 +375,7 @@ function parseMap( is_valve_fmt, map_data, wad ) {
     }
 
     const brushes = new THREE.Group( );
+    const geometries = new Map( );
 
     for ( let f_idx = 0; f_idx < face_data.length; ++f_idx ) {
       const fd = face_data[ f_idx ];
@@ -377,16 +388,14 @@ function parseMap( is_valve_fmt, map_data, wad ) {
       }
 
       if ( !texture_list.has( fd.texture ) ) {
-        if ( unique_textures.has( fd.texture ) )
-          texture_list.set( fd.texture, texture_list.get( fd.texture ) );
-        else {
+        if ( !unique_textures.has( fd.texture ) ) {
           const matching_texture = wad.extractTextureFromName( fd.texture, is_valve_fmt );
-  
+
           if ( !matching_texture ) {
-            console.error( `failed to find texture '${ fd.texture }' in WAD dir` );
+            console.error( `failed to find texture '${ fd.texture }' in wad dir` );
             continue;
           }
-  
+
           const texture = createTextureFromMip( matching_texture, is_valve_fmt );
           texture_list.set( fd.texture, texture );
           unique_textures.add( fd.texture );
@@ -395,13 +404,26 @@ function parseMap( is_valve_fmt, map_data, wad ) {
 
       const texture = texture_list.get( fd.texture );
       const face_geometry = createFaceGeometry( face_verts, fd, texture );
-      const face_material = new THREE.MeshBasicMaterial({
+      
+      if ( !geometries.has( fd.texture ) )
+        geometries.set( fd.texture, [ ] );
+        
+      geometries.get( fd.texture ).push( face_geometry );
+    }
+    
+    const keys = Array.from( geometries.keys( ) );
+    for ( let g_idx = 0; g_idx < keys.length; ++g_idx ) {
+      const tex_name = keys[ g_idx ];
+      const geoms = geometries.get( tex_name );
+      const merged_geoms = BufferGeometryUtils.mergeGeometries( geoms, true );
+      const texture = texture_list.get( tex_name );
+      const face_mtl = new THREE.MeshBasicMaterial({
         side: THREE.BackSide,
         map: texture
       });
 
-      const face_mesh = new THREE.Mesh( face_geometry, face_material );
-      brushes.add( face_mesh );
+      const merged_mesh = new THREE.Mesh( merged_geoms, face_mtl );
+      brushes.add( merged_mesh );
     }
 
     map.add( brushes );

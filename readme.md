@@ -1,17 +1,10 @@
 ### todo
- - clean main.js
-   - read over then delete scratchwork.js
-   - optimize loops
-   - optimize rendering method ( current way is not efficient for threejs standards )
-     - merged render style [here](https://threejs.org/examples/?q=instanc#webgl_instancing_performance) gave best results on laptop w/o gpu
-   - make sure all throws are handled globally
-
- - use live server to launch not vsc stuff
-
  - get map loading from file upload
    - if uploaded/current wad name does not match the one in the map settings/entity, error out w/ on screen message ( clear on matching wad load ) and dont load until it does ( split by '/' if in string and get last since we just want file name )
 
  - get wad loading from file upload
+
+ - test on craptop
 
  - go through all comments / todos
  
@@ -26,8 +19,8 @@
    - make it animated
 
  - make loading/parsing & running faster
-   - more async
-   - profile site reload & usage with firefox shits ( ff dev edition go crazy ( shill in the readme history is crazy but valid ) )
+   - more async ?
+   - profile site w ff dev ed
 
  - find / make better movement controller
    - unless its okay on mobile ( this should be tested alr )
