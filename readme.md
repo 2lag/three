@@ -4,8 +4,6 @@
 
  - get wad loading from file upload
 
- - test on craptop
-
  - go through all comments / todos
  
  - fix texture offsets / scaling, still not 100% correct ( on quake maps only i think, but maybe both. )
