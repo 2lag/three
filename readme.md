@@ -17,6 +17,7 @@
  - clean all this fucking code its a mess ( split up the functionality as much as possible )
    - no functions longer than 60 lines, no wider than 80-90 chars
    - make sure all throws are handled w/ on-screen error messages when caught
+   - split up into files more, util file, etc
    - if possible make progress functionality cleaner w/o hardcode vals
 
  - remove any remaining comments
