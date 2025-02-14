@@ -11,7 +11,7 @@
 
  - make better movement controller that incorporates delta time AND works w touch controls ( mayb onscreen ? idk )
    - unless its okay on mobile ( this should be tested alr )
-   - if it doesn't work well, copy this and add onscreen controls as well as keybound ctls
+   - if it doesn't work well, copy [this](https://github.com/sbuggay/bspview/blob/master/src/CameraControls.ts) and add onscreen control/joystick as well as keybound ctls
 
  - add hideable keybind list somewhere ( top / bottom right )
 
@@ -23,4 +23,10 @@
 
  - remove any remaining comments
 
+ - add more maps ? ( potentially [portal](https://valvearchive.com/archive/Other%20Files/Leaks/2016%20-%20Facepunch%20and%20VCC%20leaks/Files/Portal/)-exported vmfs as .maps ? )
+
+ - make ui actually look like goldsrc w [this](https://github.com/x8BitRain/webhl) && [this](https://github.com/x8BitRain/webhl/blob/master/src/css/greensteam.css)
+
  - integrate to kuso.day/map.html
+
+ - get back to fpsic proj w/ [this help](https://github.com/sbuggay/bspview/blob/master/spec/hlbsp.md)
