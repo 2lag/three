@@ -1,35 +1,24 @@
 ### todo
- - get map loading from file upload
-   - if uploaded/current wad name does not match the one in the map settings/entity, error out w/ on screen message ( clear on matching wad load ) and dont load until it does ( split by '/' if in string and get last since we just want file name )
+ - fix then animate progress bar
+   - portion in parseMap is not working because of busy thread, fix this somehow without retard async forced slowdown bullshit
 
- - get wad loading from file upload
-
- - go through all comments / todos
- 
  - fix texture offsets / scaling, still not 100% correct ( on quake maps only i think, but maybe both. )
-   - also some planes are just completely wrong for some reason on c1a0, look at the left corner in the entrance room after airlock ( just rotation of geometry i think )
-
- - clean all this fucking code its a mess ( split up the functionality as much as possible )
-   - no functions longer than 60 lines, no wider than 80-90 chars
-   - make sure all throws are handled
-
- - show status of loading with progress bar ( alr impld, just need integ )
-   - make it animated
 
  - make loading/parsing & running faster
    - more async ?
    - profile site w ff dev ed
 
- - find / make better movement controller
+ - make better movement controller that incorporates delta time AND works w touch controls ( mayb onscreen ? idk )
    - unless its okay on mobile ( this should be tested alr )
+   - if it doesn't work well, copy this and add onscreen controls as well as keybound ctls
 
- - remove all remaining comments
-
- - add keybind list somewhere
-
- - redesign ui to be even better if needed
+ - add hideable keybind list somewhere ( top / bottom right )
 
  - clean all this fucking code its a mess ( split up the functionality as much as possible )
    - no functions longer than 60 lines, no wider than 80-90 chars
+   - make sure all throws are handled w/ on-screen error messages when caught
+   - if possible make progress functionality cleaner w/o hardcode vals
+
+ - remove any remaining comments
 
  - integrate to kuso.day/map.html

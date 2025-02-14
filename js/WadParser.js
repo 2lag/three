@@ -37,7 +37,7 @@ class WadParser {
     this.header.dir_offset = this.readInt32( );
 
     if ( this.header.magic !== "WAD3" && this.header.magic !== "WAD2" )
-      throw new Error( `invalid WAD file: ${ this.header.magic }` );
+      throw new Error( `Invalid WAD file: ${ this.header.magic }` );
   }
 
   parseDirectory( ) {

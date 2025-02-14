@@ -5,21 +5,38 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { getQuakePalette } from './js/static.js'
 import WadParser from './js/WadParser.js';
 
+const FULLBRIGHT_IDX = 0xE0;
 const HALF_PI = Math.PI / 2;
 const UPDATE_TIME = 1 / 60;
 const FLT_EPSILON = 1e-6;
 
-function loadWad( wad_data ) {
+let dom_texture_showcase,
+    dom_map_picker,
+    dom_wireframe,
+    dom_settings,
+    dom_progress,
+    dom_map_name,
+    dom_wad_name,
+    dom_error;
+
+let map_data = "",
+    wad_data = "";
+
+function loadWad( ) {
   let parser = new WadParser( wad_data );
 
-  try {
-    parser.parseHeader( );
-  } catch( err ) {
-    // todo : display `Invalid WAD : ${ parser.header.magic }` msg on screen
-  }
+  try { parser.parseHeader( ); }
+  catch( err ) { setErrorMessage( err.message ); }
 
   parser.parseDirectory( );
   return parser;
+}
+
+function setErrorMessage( msg ) {
+  dom_error.style.display = "flex";
+  dom_error.innerText = msg;
+
+  setTimeout( ( ) => { dom_error.style.display = "none"; }, 3333 );
 }
 
 const quake_line_regex = /^\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s+(\S+)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/;
@@ -54,8 +71,8 @@ function parseValveMapLine( line ) {
     v1: new THREE.Vector3( Number( match[ 4 ] ), Number( match[ 5 ] ), Number( match[ 6 ] ) ),
     v2: new THREE.Vector3( Number( match[ 7 ] ), Number( match[ 8 ] ), Number( match[ 9 ] ) ),
     texture: match[ 10 ],
-    u: new THREE.Vector4( Number( match[ 11 ] ), Number( match[ 12 ] ), Number( match[ 13 ] ), Number( match[ 14 ] ) ), // Ux Uy Uz Uoffset
-    v: new THREE.Vector4( Number( match[ 15 ] ), Number( match[ 16 ] ), Number( match[ 17 ] ), Number( match[ 18 ] ) ), // Vx Vy Vz Voffset
+    u: new THREE.Vector4( Number( match[ 11 ] ), Number( match[ 12 ] ), Number( match[ 13 ] ), Number( match[ 14 ] ) ),
+    v: new THREE.Vector4( Number( match[ 15 ] ), Number( match[ 16 ] ), Number( match[ 17 ] ), Number( match[ 18 ] ) ),
     rotation: Number( match[ 19 ] ),
     uv_scale: new THREE.Vector2( Number( match[ 20 ] ), Number( match[ 21 ] ) )
   };
@@ -95,7 +112,7 @@ function isPointInsideBrush( point, planes ) {
 }
 
 let u_vec3 = new THREE.Vector3( );
-let v_vec3 = new THREE.Vector3( ); // vivek ramaswamy mentioned ??
+let v_vec3 = new THREE.Vector3( ); /* vivek ramaswamy mentioned ?? */
 const tan010 = new THREE.Vector3( 0, 1, 0 );
 const tan100 = new THREE.Vector3( 1, 0, 0 );
 function getUVAxis( normal ) {
@@ -210,9 +227,8 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   for ( let idx = 0; idx < data.length; ++idx ) {
     const palette_idx = data[ idx ];
 
-    // fullbright ignores fire/lighting
     let alpha = 255;
-    if ( !is_valve_fmt && palette_idx >= 0xE0 )
+    if ( !is_valve_fmt && palette_idx >= FULLBRIGHT_IDX )
       alpha = 0;
 
     const [ r, g, b ] = palette[ palette_idx ];
@@ -232,7 +248,7 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   cdiv.id = name;
 
   cdiv.appendChild( canvas );
-  texture_showcase.appendChild( cdiv );
+  dom_texture_showcase.appendChild( cdiv );
   
   const texture = new THREE.Texture( canvas );
   texture.magFilter = THREE.NearestFilter;
@@ -246,10 +262,10 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
 }
 
 function sortTexturesById( ) {
-  if ( !texture_showcase )
+  if ( !dom_texture_showcase )
     return;
 
-  const elements = Array.from( texture_showcase.children );
+  const elements = Array.from( dom_texture_showcase.children );
 
   if ( !elements )
     return;
@@ -268,7 +284,7 @@ function sortTexturesById( ) {
   });
 
   for ( let e_idx = 0; e_idx < elements.length; ++e_idx )
-    texture_showcase.appendChild( elements[ e_idx ] );
+    dom_texture_showcase.appendChild( elements[ e_idx ] );
 }
 
 function setCamPos( x, y, z ) {
@@ -303,7 +319,7 @@ function computeBrushVertices( planes ) {
 }
 
 const origin_regex = /"origin"\s*"(-?\d+)\s+(-?\d+)\s+(-?\d+)"/;
-function parseMap( is_valve_fmt, map_data, wad ) {
+function parseMap( is_valve_fmt, wad ) {
   let unique_textures = new Set( );
   const map = new THREE.Group( );
   let texture_list = new Map( );
@@ -314,7 +330,13 @@ function parseMap( is_valve_fmt, map_data, wad ) {
                     .map( b => b.trim( ) )
                     .filter( b => b );
 
+  let progress_track = getProgress( );
+  const delta_progress = 95 - progress_track;
+  const block_delta = delta_progress / blocks.length;
   for ( let b_idx = 0; b_idx < blocks.length; ++b_idx ) {
+    progress_track += block_delta;
+    setProgress( progress_track );
+
     const block = blocks[ b_idx ];
     const face_data = [ ];
 
@@ -371,7 +393,7 @@ function parseMap( is_valve_fmt, map_data, wad ) {
 
     if ( !vertices.length ) {
       console.error( "no vertices computed for brush" );
-      return;
+      continue;
     }
 
     const brushes = new THREE.Group( );
@@ -428,22 +450,25 @@ function parseMap( is_valve_fmt, map_data, wad ) {
 
     map.add( brushes );
   }
-
+  
   sortTexturesById( );
   scene.add( map );
+  
+  setProgress( 100 );
+
   return true;
 }
 
 function setHudNames( m, w ) {
-  if ( !map_name || !wad_name )
+  if ( !dom_map_name || !dom_wad_name )
     return;
 
-  map_name.innerText = m;
-  wad_name.innerText = w;
+  dom_map_name.innerText = m;
+  dom_wad_name.innerText = w;
 }
 
 const wad_regex = /^"wad"\s*"([^";]+?\.wad)(?=;|")/;
-function extractFirstWadName( map_data ) {
+function extractFirstWadName( ) {
   const lines = map_data.split( "\n" )
                         .map( l => l.trim( ) )
                         .filter( l => l.length );
@@ -470,37 +495,52 @@ async function loadDefaultMap( map ) {
 
   try {
     const map_file = await fetch( map );
-    const map_data = await map_file.text( );
 
-    const wad_name = extractFirstWadName( map_data );
+    setProgress( 3 );
+
+    map_data = await map_file.text( );
+
+    setProgress( 6 );
+
+    const wad_name = extractFirstWadName( );
 
     if ( !wad_name )
-      throw new Error( `failed to find wad in ${ map }` );
+      throw new Error( `Failed to find WAD in ${ map }` );
 
     const wad_file = await fetch( wad_name );
-    const wad_data = await wad_file.arrayBuffer( );
 
-    if ( loadMap( map_data, wad_data ) ) {
+    setProgress( 10 );
+
+    wad_data = await wad_file.arrayBuffer( );
+
+    setProgress( 15 );
+
+    if ( loadMap( ) ) {
       setHudNames(
         map.split( "/" ).slice( -1 )[ 0 ],
         wad_name.split( "/" ).slice( -1 )[ 0 ]
       );
     }
-    else
-      ret = false;
+    else ret = false;
   } catch ( err ) {
-    console.error( "failed to load default map:", err );
+    hideProgress( );
+    
+    setErrorMessage( "Failed to load default map:", err );
     ret = false;
   }
 
-  hideProgress( );
   return ret;
 }
 
-function loadMap( map_data, wad_data ) {
+function loadMap( ) {
   const valve_map = map_data.includes( "[" ) || map_data.includes( "]" );
-  const wad = loadWad( wad_data );
-  return parseMap( valve_map, map_data, wad );
+  const wad = loadWad( );
+
+  setProgress( 20 );
+
+  const ret = Promise.resolve( parseMap( valve_map, wad ) );
+  hideProgress( );
+  return ret;
 }
 
 let cam;
@@ -532,52 +572,170 @@ async function init( ) {
   return await loadDefaultMap( "files/valve/c1a0.map" );
 }
 
+function hideProgress( ) {
+  if ( !dom_progress )
+    return;
+
+  dom_progress.style.display = "none";
+}
+
+function setProgress( val ) {
+  if ( !dom_progress )
+    return;
+
+  if ( typeof val !== "number" )
+    return;
+
+  dom_progress.style.display = "block";
+  dom_progress.value = Math.round( val );
+}
+
+function getProgress( ) {
+  if ( !dom_progress )
+    return 0;
+
+  return Number( dom_progress.value );
+}
+
 function render( ) {
   requestAnimationFrame( render );
   controls.update( UPDATE_TIME );
   renderer.render( scene, cam );
 }
 
+//#region Event Handlers
+let prev_map_selection = null;
+
+function toggleBottomCollapsibleSection( e ) {
+  const btn = e.target;
+
+  if ( !dom_settings )
+    return;
+  
+  dom_settings.classList.toggle( 'active' );
+  btn.classList.toggle( 'active' );
+  
+  if ( dom_settings.classList.contains( 'active' ) )
+    dom_texture_showcase.style.height = "calc( 100% - 132px )";
+  else
+    dom_texture_showcase.style.height = "100%";
+
+  btn.innerText = ( !btn.classList.contains( 'active' ) ) ? '+' : '-';
+  btn.style.bottom = ( !btn.classList.contains( 'active' ) ) ? "8px" : "136px";
+}
+
 function toggleSideCollapsibleSection( e ) {
   const btn = e.target;
   
-  texture_showcase.classList.toggle( 'active' );
+  dom_texture_showcase.classList.toggle( 'active' );
   btn.classList.toggle( 'active' );
   
   btn.innerText = ( !btn.classList.contains( 'active' ) ) ? '+' : '-';
   btn.style.left = ( !btn.classList.contains( 'active' ) ) ? "8px" : "25%";
 }
 
-function toggleBottomCollapsibleSection( e ) {
-  const btn = e.target;
+async function mapFileChange( e ) {
+  const files = e.target.files;
 
-  if ( !settings )
+  setProgress( 0 );
+
+  let file;
+  let map_found = false;
+  for ( let f_idx = 0; f_idx < files.length; ++f_idx ) {
+    const f = files[ f_idx ];
+
+    if ( f.size === 0 )
+      continue;
+    
+    if ( !f.name.endsWith( ".map" ) )
+      continue;
+
+    map_found = true;
+    file = f;
+    break;
+  }
+
+  setProgress( 1 );
+
+  try {
+    if ( !map_found )
+      throw new Error( "No map found" );
+    
+    setProgress( 2 );
+
+    map_data = await file.text( );
+    let wad_name = extractFirstWadName( );
+
+    setProgress( 5 );
+  
+    if ( !wad_name || !wad_name.endsWith( '.wad' ) )
+      throw new Error( `WAD name not found in ${ file.name }` );
+  
+    const cur_wad = dom_wad_name.innerText;
+    wad_name = wad_name.split( "/" ).slice( -1 )[ 0 ];
+  
+    if ( cur_wad !== wad_name )
+      throw new Error( `Please upload the WAD first ☺️\nCurrent WAD is ${ cur_wad }` );
+  } catch ( err ) {
+    hideProgress( );
+
+    setErrorMessage( err.message );
     return;
-  
-  settings.classList.toggle( 'active' );
-  btn.classList.toggle( 'active' );
-  
-  if ( settings.classList.contains( 'active' ) )
-    texture_showcase.style.height = "calc( 100% - 132px )";
-  else
-    texture_showcase.style.height = "100%";
+  }
 
-  btn.innerText = ( !btn.classList.contains( 'active' ) ) ? '+' : '-';
-  btn.style.bottom = ( !btn.classList.contains( 'active' ) ) ? "8px" : "136px";
+  prev_map_selection = dom_map_picker.options[ dom_map_picker.selectedIndex ].text;
+  dom_map_picker.selectedIndex = dom_map_picker.length - 1;
+  
+  if ( dom_wireframe.checked )
+    dom_wireframe.checked = false;
+
+  setProgress( 10 );
+
+  scene.clear( );
+  dom_map_name.innerText = file.name;
+  dom_texture_showcase.innerHTML = "";
+  loadMap( );
 }
 
-let prev_map_selection = null;
+async function wadFileChange( e ) {
+  const files = e.target.files;
+
+  let file;
+  let wad_found = false;
+  for ( let f_idx = 0; f_idx < files.length; ++f_idx ) {
+    const f = files[ f_idx ];
+
+    if ( f.size === 0 )
+      continue;
+    
+    if ( !f.name.endsWith( ".wad" ) )
+      continue;
+
+    wad_found = true;
+    file = f;
+    break;
+  }
+
+  if ( !wad_found ) {
+    setErrorMessage( "No WAD found" );
+    return;
+  }
+
+  dom_wad_name.innerText = file.name;
+  wad_data = await file.arrayBuffer( );
+}
+
 function selectChangeMap( e ) {
   const selection = e.target.value;
 
   if ( selection === "File Upload" || selection === prev_map_selection )
     return;
 
-  if ( wireframe_cb && wireframe_cb.checked )
-    wireframe_cb.checked = false;
+  if ( dom_wireframe && dom_wireframe.checked )
+    dom_wireframe.checked = false;
 
   scene.clear( );
-  texture_showcase.innerHTML = "";
+  dom_texture_showcase.innerHTML = "";
   prev_map_selection = e.target.value;
   Promise.resolve( loadDefaultMap( e.target.value ) );
 }
@@ -590,121 +748,50 @@ function toggleWireframe( e ) {
     }
   });
 }
+//#endregion
 
-function mapFileChange( e ) {
-  const files = e.target.files;
-
-  let map_found = false;
-  for ( let f_idx = 0; f_idx < files.length; ++f_idx ) {
-    const file = files[ f_idx ];
-
-    if ( file.size === 0 )
-      continue;
-    
-    if ( !file.name.endsWith( ".map" ) )
-      continue;
-
-    map_found = true;
-    break;
-  }
-
-  if ( !map_found )
-    throw new Error( "no map found" );
-
-  // set select element w/ id map_picker to option 'File Upload'
-
-  // validate wad in map data
-  //  if wad is not uploaded, throw error & wait for wadFileChange
-  //  if wad is uploaded, continue
-  
-  // make sure to set wireframe_cb.checked to false
-  
-  // copy selectChangeMap here
-}
-
-function wadFileChange( e ) {
-  const files = e.target.files;
-
-  let wad_found = false;
-  for ( let f_idx = 0; f_idx < files.length; ++f_idx ) {
-    const file = files[ f_idx ];
-
-    if ( file.size === 0 )
-      continue;
-    
-    if ( !file.name.endsWith( ".wad" ) )
-      continue;
-
-    wad_found = true;
-    break;
-  }
-
-  if ( !wad_found )
-    throw new Error( "no wad found" );
-
-  // validate this is the correct wad with map data
-  //  if map is not uploaded&matched, throw error & wait for mapFileChange
-  //  if map is uploaded, continue
-  
-  // make sure to set wireframe_cb.checked to false
-
-  // copy selectChangeMap here
-}
-
-function hideProgress( ) {
-  if ( !progress )
-    return;
-
-  progress.style.display = "none";
-}
-
-function setProgress( val ) {
-  if ( !progress )
-    return;
-
-  if ( typeof val !== "number" )
-    return;
-
-  progress.style.display = "block";
-  progress.value = val;
-}
-
-let texture_showcase, settings, wireframe_cb, map_picker, progress, map_name, wad_name;
-document.addEventListener( "DOMContentLoaded", ( ) => {
+//#region Events
+document.addEventListener( "DOMContentLoaded", async ( ) => {
+  dom_progress = document.getElementById( 'progress' );
   setProgress( 0 );
 
-  texture_showcase = document.getElementById( 'side_collapsible_section' );
-  settings = document.getElementById( 'bottom_collapsible_section' );
-  wireframe_cb = document.getElementById( 'wireframe' );
-  map_picker = document.getElementById( 'map_picker' );
-  progress = document.getElementById( 'progress' );
-  map_name = document.getElementById( 'map_name' );
-  wad_name = document.getElementById( 'wad_name' );
+  dom_texture_showcase = document.getElementById( 'side_collapsible_section' );
+  dom_settings = document.getElementById( 'bottom_collapsible_section' );
+  dom_map_picker = document.getElementById( 'map_picker' );
+  dom_wireframe = document.getElementById( 'wireframe' );
+  dom_map_name = document.getElementById( 'map_name' );
+  dom_wad_name = document.getElementById( 'wad_name' );
+  dom_error = document.getElementById( 'error' );
 
   document.getElementById( 'bottom_collapsible_btn' ).onclick = toggleBottomCollapsibleSection;
   document.getElementById( 'side_collapsible_btn' ).onclick = toggleSideCollapsibleSection;
   document.getElementById( 'map' ).onchange = mapFileChange;
   document.getElementById( 'wad' ).onchange = wadFileChange;
   
-  wireframe_cb.onclick = toggleWireframe;
-  map_picker.onchange = selectChangeMap;
+  dom_map_picker.onchange = selectChangeMap;
+  dom_wireframe.onclick = toggleWireframe;
+
+  if ( await init( ) )
+    render( );
+  else
+    document.body.appendChild( WebGL.getWebGL2ErrorMessage( ) );
 });
 
 onkeyup = ( e ) => {
-  if ( !wireframe_cb )
+  if ( !dom_wireframe )
     return;
 
   if ( e.key !== 'x' )
     return;
 
-  wireframe_cb.click( );
+  dom_wireframe.click( );
 };
 
 onkeydown = ( e ) => {
-  if ( !map_picker )
+  if ( !dom_map_picker )
     return;
 
-  if ( e.target !== map_picker )
+  if ( e.target !== dom_map_picker )
     return;
 
   e.preventDefault( );
@@ -718,8 +805,4 @@ onresize = ( ) => {
 
   cam.updateProjectionMatrix( );
 };
-
-if ( await init( ) )
-  render( );
-else
-  document.body.appendChild( WebGL.getWebGL2ErrorMessage( ) );
+//#endregion

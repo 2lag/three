@@ -147,3 +147,23 @@ label, select,
   accent-color: #333;
   filter: invert( );
 }
+
+#error {
+  transform: translate( -50%, -50% );
+  background-color: #E76969;
+  border: 2px solid #000;
+  justify-content: center;
+  border-radius: 15px;
+  align-items: center;
+  position: absolute;
+  max-height: 256px;
+  min-height: 128px;
+  max-width: 512px;
+  min-width: 128px;
+  display: none;
+  color: #000;
+  height: 10%;
+  width: 50%;
+  left: 50%;
+  top: 50%;
+}
