@@ -4,23 +4,47 @@ import { FlyControls } from 'three/addons/controls/FlyControls.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { getQuakePalette } from './js/static.js'
 import WadParser from './js/WadParser.js';
+import {
+  setProgress, getProgress, hideProgress,
+  setErrorMessage,
+  sortTexturesById,
+  setHudNames, getWadName, setWadName, setMapName,
+  appendTexture, clearTextures,
+  setTextureShowcaseHeight,
+  toggleTextureShowcase,
+  toggleSettings, isSettingsActive
+} from './js/DOMUtil.js';
 
+const valve_line_regex = /^\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s+(\S+)\s+\[\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+\]\s+\[\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+\]\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/;
+const quake_line_regex = /^\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s+(\S+)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/;
+const origin_regex = /"origin"\s*"(-?\d+)\s+(-?\d+)\s+(-?\d+)"/;
+const wad_regex = /^"wad"\s*"([^";]+?\.wad)(?=;|")/;
+
+const quake_palette = getQuakePalette( );
+
+const HALF_PI = Math.PI * 0.5;
 const FULLBRIGHT_IDX = 0xE0;
-const HALF_PI = Math.PI / 2;
-const UPDATE_TIME = 1 / 60;
+const UPDATE_TIME = 1 / 20;
 const FLT_EPSILON = 1e-6;
 
-let dom_texture_showcase,
-    dom_map_picker,
-    dom_wireframe,
-    dom_settings,
-    dom_progress,
-    dom_map_name,
-    dom_wad_name,
-    dom_error;
+let dom_map_picker, dom_wireframe;
+let map_data = "", wad_data = "";
 
-let map_data = "",
-    wad_data = "";
+const tan010 = new THREE.Vector3( 0, 1, 0 );
+const tan100 = new THREE.Vector3( 1, 0, 0 );
+const ci_term0 = new THREE.Vector3( );
+const ci_term1 = new THREE.Vector3( );
+const ci_term2 = new THREE.Vector3( );
+const u_vec3 = new THREE.Vector3( );
+const v_vec3 = new THREE.Vector3( );
+/* vivek ramaswamy mentioned ?? */
+const scene = new THREE.Scene( );
+const v0 = new THREE.Vector3( );
+const v1 = new THREE.Vector3( );
+const v2 = new THREE.Vector3( );
+let controls;
+let renderer;
+let cam;
 
 function loadWad( ) {
   let parser = new WadParser( wad_data );
@@ -32,14 +56,6 @@ function loadWad( ) {
   return parser;
 }
 
-function setErrorMessage( msg ) {
-  dom_error.style.display = "flex";
-  dom_error.innerText = msg;
-
-  setTimeout( ( ) => { dom_error.style.display = "none"; }, 3333 );
-}
-
-const quake_line_regex = /^\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s+(\S+)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/;
 function parseQuakeMapLine( line ) {
   const match = line.match( quake_line_regex );
 
@@ -48,9 +64,9 @@ function parseQuakeMapLine( line ) {
 
   return {
     type: "QUAKE",
-    v0: new THREE.Vector3( Number( match[ 1 ] ), Number( match[ 2 ] ), Number( match[ 3 ] ) ),
-    v1: new THREE.Vector3( Number( match[ 4 ] ), Number( match[ 5 ] ), Number( match[ 6 ] ) ),
-    v2: new THREE.Vector3( Number( match[ 7 ] ), Number( match[ 8 ] ), Number( match[ 9 ] ) ),
+    v0: v0.set( Number( match[ 1 ] ), Number( match[ 2 ] ), Number( match[ 3 ] ) ),
+    v1: v1.set( Number( match[ 4 ] ), Number( match[ 5 ] ), Number( match[ 6 ] ) ),
+    v2: v2.set( Number( match[ 7 ] ), Number( match[ 8 ] ), Number( match[ 9 ] ) ),
     texture: match[ 10 ],
     uv_offset: new THREE.Vector2( Number( match[ 11 ] ), Number( match[ 12 ] ) ),
     rotation: Number( match[ 13 ] ),
@@ -58,7 +74,6 @@ function parseQuakeMapLine( line ) {
   };
 }
 
-const valve_line_regex = /^\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s+(\S+)\s+\[\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+\]\s+\[\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+\]\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/;
 function parseValveMapLine( line ) {
   const match = line.match( valve_line_regex );
 
@@ -67,9 +82,9 @@ function parseValveMapLine( line ) {
 
   return {
     type: "VALVE",
-    v0: new THREE.Vector3( Number( match[ 1 ] ), Number( match[ 2 ] ), Number( match[ 3 ] ) ),
-    v1: new THREE.Vector3( Number( match[ 4 ] ), Number( match[ 5 ] ), Number( match[ 6 ] ) ),
-    v2: new THREE.Vector3( Number( match[ 7 ] ), Number( match[ 8 ] ), Number( match[ 9 ] ) ),
+    v0: v0.set( Number( match[ 1 ] ), Number( match[ 2 ] ), Number( match[ 3 ] ) ),
+    v1: v1.set( Number( match[ 4 ] ), Number( match[ 5 ] ), Number( match[ 6 ] ) ),
+    v2: v2.set( Number( match[ 7 ] ), Number( match[ 8 ] ), Number( match[ 9 ] ) ),
     texture: match[ 10 ],
     u: new THREE.Vector4( Number( match[ 11 ] ), Number( match[ 12 ] ), Number( match[ 13 ] ), Number( match[ 14 ] ) ),
     v: new THREE.Vector4( Number( match[ 15 ] ), Number( match[ 16 ] ), Number( match[ 17 ] ), Number( match[ 18 ] ) ),
@@ -78,9 +93,6 @@ function parseValveMapLine( line ) {
   };
 }
 
-const term0 = new THREE.Vector3( );
-const term1 = new THREE.Vector3( );
-const term2 = new THREE.Vector3( );
 function computeIntersection( p0, p1, p2 ) {
   const n0 = p0.normal;
   const n1 = p1.normal;
@@ -91,11 +103,11 @@ function computeIntersection( p0, p1, p2 ) {
   if ( Math.abs( denominator ) < FLT_EPSILON )
     return null;
 
-  term0.crossVectors( n1, n2 ).multiplyScalar( -p0.constant );
-  term1.crossVectors( n2, n0 ).multiplyScalar( -p1.constant );
-  term2.crossVectors( n0, n1 ).multiplyScalar( -p2.constant );
+  ci_term0.crossVectors( n1, n2 ).multiplyScalar( -p0.constant );
+  ci_term1.crossVectors( n2, n0 ).multiplyScalar( -p1.constant );
+  ci_term2.crossVectors( n0, n1 ).multiplyScalar( -p2.constant );
 
-  return new THREE.Vector3( ).addVectors( term0 , term1 ).add( term2 ).divideScalar( denominator );
+  return new THREE.Vector3( ).addVectors( ci_term0 , ci_term1 ).add( ci_term2 ).divideScalar( denominator );
 }
 
 function isPointInsideBrush( point, planes ) {
@@ -111,14 +123,71 @@ function isPointInsideBrush( point, planes ) {
   return true;
 }
 
-let u_vec3 = new THREE.Vector3( );
-let v_vec3 = new THREE.Vector3( ); /* vivek ramaswamy mentioned ?? */
-const tan010 = new THREE.Vector3( 0, 1, 0 );
-const tan100 = new THREE.Vector3( 1, 0, 0 );
 function getUVAxis( normal ) {
   let tangent = ( Math.abs( normal.dot( tan010 ) ) > 0.99 ) ? tan100 : tan010;
   u_vec3.crossVectors( normal, tangent ).normalize( );
   v_vec3.crossVectors( normal, u_vec3  ).normalize( );
+}
+
+function computeUVForVertex( vertex, line_data, texture ) {
+  const angle = THREE.MathUtils.degToRad( line_data.rotation );
+  const cos = Math.cos( angle );
+  const sin = Math.sin( angle );
+
+  let uv_offset;
+  if ( line_data.type === "VALVE" ) {
+    u_vec3.set( line_data.u.x, line_data.u.y, line_data.u.z );
+    v_vec3.set( line_data.v.x, line_data.v.y, line_data.v.z );
+    uv_offset = new THREE.Vector2( line_data.u.w, line_data.v.w );
+  } else {
+    getUVAxis( line_data.plane.normal );
+    uv_offset = line_data.uv_offset;
+  }
+
+  const rotated_u = u_vec3.clone( ).multiplyScalar( cos ).add( v_vec3.clone( ).multiplyScalar( -sin ) );
+  const rotated_v = u_vec3.clone( ).multiplyScalar( sin ).add( v_vec3.clone( ).multiplyScalar(  cos ) );
+
+  const u = vertex.dot( rotated_u ) * ( 1 / line_data.uv_scale.x ) + uv_offset.x;
+  const v = vertex.dot( rotated_v ) * ( 1 / line_data.uv_scale.y ) + uv_offset.y;
+  
+  return new THREE.Vector2(
+    u / texture.image.width,
+    v / texture.image.height
+  );
+}
+
+function createFaceGeometry( verts, face_data, texture ) {
+  const positions = [ ];
+  const indices = [ ];
+  const uvs = [ ];
+
+  getUVAxis( face_data.plane.normal );
+
+  const verts_2d = verts.map( v => new THREE.Vector2( v.dot( u_vec3 ), v.dot( v_vec3 ) ) );
+  const triangles = THREE.ShapeUtils.triangulateShape( verts_2d, [ ] );
+
+  for ( let v_idx = 0; v_idx < verts.length; ++v_idx ) {
+    const vert = verts[ v_idx ];
+
+    const uv = computeUVForVertex( vert, face_data, texture );
+
+    positions.push( vert.x, vert.y, vert.z );
+    uvs.push( uv.x, uv.y );
+  }
+  
+  for ( let t_idx = 0; t_idx < triangles.length; ++t_idx ) {
+    const tri = triangles[ t_idx ];
+    
+    indices.push( tri[0], tri[1], tri[2] );
+  }
+  
+  const geometry = new THREE.BufferGeometry( );
+  geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
+  geometry.setAttribute( 'uv', new THREE.Float32BufferAttribute( uvs, 2 ) );
+  geometry.setIndex( indices );
+
+  geometry.computeVertexNormals( );
+  return geometry;
 }
 
 function getFacePolygon( plane, verts ) {
@@ -150,68 +219,6 @@ function getFacePolygon( plane, verts ) {
   return face_verts;
 }
 
-function computeUVForVertex( vertex, line_data, texture ) {
-  const angle = THREE.MathUtils.degToRad( line_data.rotation );
-  const cos = Math.cos( angle );
-  const sin = Math.sin( angle );
-
-  let uv_offset;
-  if ( line_data.type === "VALVE" ) {
-    u_vec3.set( line_data.u.x, line_data.u.y, line_data.u.z );
-    v_vec3.set( line_data.v.x, line_data.v.y, line_data.v.z );
-    uv_offset = new THREE.Vector2( line_data.u.w, line_data.v.w );
-  } else {
-    getUVAxis( line_data.plane.normal );
-    uv_offset = line_data.uv_offset;
-  }
-
-  const rotated_u = u_vec3.clone( ).multiplyScalar( cos ).add( v_vec3.clone( ).multiplyScalar( -sin ) );
-  const rotated_v = u_vec3.clone( ).multiplyScalar( sin ).add( v_vec3.clone( ).multiplyScalar(  cos ) );
-
-  const u = vertex.dot( rotated_u ) * ( 1 / line_data.uv_scale.x ) + uv_offset.x;
-  const v = vertex.dot( rotated_v ) * ( 1 / line_data.uv_scale.y ) + uv_offset.y;
-  
-  return new THREE.Vector2(
-    u / texture.image.width,
-    v / texture.image.height
-  );
-}
-
-function createFaceGeometry( verts, face_data, texture ) {
-  getUVAxis( face_data.plane.normal );
-  
-  const verts_2d = verts.map( v => new THREE.Vector2( v.dot( u_vec3 ), v.dot( v_vec3 ) ) );
-  const triangles = THREE.ShapeUtils.triangulateShape( verts_2d, [ ] );
-
-  const uvs = [ ];
-  const positions = [ ];
-  
-  for ( let v_idx = 0; v_idx < verts.length; ++v_idx ) {
-    const vert = verts[ v_idx ];
-
-    const uv = computeUVForVertex( vert, face_data, texture );
-
-    positions.push( vert.x, vert.y, vert.z );
-    uvs.push( uv.x, uv.y );
-  }
-  
-  const indices = [ ];
-  for ( let t_idx = 0; t_idx < triangles.length; ++t_idx ) {
-    const tri = triangles[ t_idx ];
-    
-    indices.push( tri[0], tri[1], tri[2] );
-  }
-  
-  const geometry = new THREE.BufferGeometry( );
-  geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
-  geometry.setAttribute( 'uv', new THREE.Float32BufferAttribute( uvs, 2 ) );
-  geometry.setIndex( indices );
-
-  geometry.computeVertexNormals( );
-  return geometry;
-}
-
-const quake_palette = getQuakePalette( );
 function createTextureFromMip( mip_tex, is_valve_fmt ) {
   const palette = ( is_valve_fmt ) ? mip_tex.palette : quake_palette;
   const { name, width, height, data } = mip_tex;
@@ -248,8 +255,8 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   cdiv.id = name;
 
   cdiv.appendChild( canvas );
-  dom_texture_showcase.appendChild( cdiv );
-  
+  appendTexture( cdiv );
+
   const texture = new THREE.Texture( canvas );
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
@@ -259,32 +266,6 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   texture.flipY = false;
 
   return texture;
-}
-
-function sortTexturesById( ) {
-  if ( !dom_texture_showcase )
-    return;
-
-  const elements = Array.from( dom_texture_showcase.children );
-
-  if ( !elements )
-    return;
-
-  elements.sort( ( a, b ) => {
-    const id_a = a.id.toUpperCase( );
-    const id_b = b.id.toUpperCase( );
-
-    if ( id_a < id_b )
-      return -1;
-    
-    if ( id_a > id_b )
-      return  1;
-
-    return 0;
-  });
-
-  for ( let e_idx = 0; e_idx < elements.length; ++e_idx )
-    dom_texture_showcase.appendChild( elements[ e_idx ] );
 }
 
 function setCamPos( x, y, z ) {
@@ -318,7 +299,6 @@ function computeBrushVertices( planes ) {
   return verts;
 }
 
-const origin_regex = /"origin"\s*"(-?\d+)\s+(-?\d+)\s+(-?\d+)"/;
 function parseMap( is_valve_fmt, wad ) {
   let unique_textures = new Set( );
   const map = new THREE.Group( );
@@ -459,15 +439,6 @@ function parseMap( is_valve_fmt, wad ) {
   return true;
 }
 
-function setHudNames( m, w ) {
-  if ( !dom_map_name || !dom_wad_name )
-    return;
-
-  dom_map_name.innerText = m;
-  dom_wad_name.innerText = w;
-}
-
-const wad_regex = /^"wad"\s*"([^";]+?\.wad)(?=;|")/;
 function extractFirstWadName( ) {
   const lines = map_data.split( "\n" )
                         .map( l => l.trim( ) )
@@ -538,15 +509,10 @@ function loadMap( ) {
 
   setProgress( 20 );
 
-  const ret = Promise.resolve( parseMap( valve_map, wad ) );
+  const ret = parseMap( valve_map, wad );
   hideProgress( );
   return ret;
 }
-
-let cam;
-let renderer;
-let controls;
-const scene = new THREE.Scene( );
 
 async function init( ) {
   if ( !WebGL.isWebGL2Available( ) )
@@ -572,31 +538,6 @@ async function init( ) {
   return await loadDefaultMap( "files/valve/c1a0.map" );
 }
 
-function hideProgress( ) {
-  if ( !dom_progress )
-    return;
-
-  dom_progress.style.display = "none";
-}
-
-function setProgress( val ) {
-  if ( !dom_progress )
-    return;
-
-  if ( typeof val !== "number" )
-    return;
-
-  dom_progress.style.display = "block";
-  dom_progress.value = Math.round( val );
-}
-
-function getProgress( ) {
-  if ( !dom_progress )
-    return 0;
-
-  return Number( dom_progress.value );
-}
-
 function render( ) {
   requestAnimationFrame( render );
   controls.update( UPDATE_TIME );
@@ -609,16 +550,13 @@ let prev_map_selection = null;
 function toggleBottomCollapsibleSection( e ) {
   const btn = e.target;
 
-  if ( !dom_settings )
-    return;
-  
-  dom_settings.classList.toggle( 'active' );
+  toggleSettings( );
   btn.classList.toggle( 'active' );
   
-  if ( dom_settings.classList.contains( 'active' ) )
-    dom_texture_showcase.style.height = "calc( 100% - 132px )";
+  if ( isSettingsActive( ) )
+    setTextureShowcaseHeight( "calc( 100% - 132px )" );
   else
-    dom_texture_showcase.style.height = "100%";
+    setTextureShowcaseHeight( "100%" );
 
   btn.innerText = ( !btn.classList.contains( 'active' ) ) ? '+' : '-';
   btn.style.bottom = ( !btn.classList.contains( 'active' ) ) ? "8px" : "136px";
@@ -627,7 +565,7 @@ function toggleBottomCollapsibleSection( e ) {
 function toggleSideCollapsibleSection( e ) {
   const btn = e.target;
   
-  dom_texture_showcase.classList.toggle( 'active' );
+  toggleTextureShowcase( );
   btn.classList.toggle( 'active' );
   
   btn.innerText = ( !btn.classList.contains( 'active' ) ) ? '+' : '-';
@@ -671,7 +609,7 @@ async function mapFileChange( e ) {
     if ( !wad_name || !wad_name.endsWith( '.wad' ) )
       throw new Error( `WAD name not found in ${ file.name }` );
   
-    const cur_wad = dom_wad_name.innerText;
+    const cur_wad = getWadName( );
     wad_name = wad_name.split( "/" ).slice( -1 )[ 0 ];
   
     if ( cur_wad !== wad_name )
@@ -686,14 +624,12 @@ async function mapFileChange( e ) {
   prev_map_selection = dom_map_picker.options[ dom_map_picker.selectedIndex ].text;
   dom_map_picker.selectedIndex = dom_map_picker.length - 1;
   
-  if ( dom_wireframe.checked )
-    dom_wireframe.checked = false;
-
+  setWireframeOff( );
   setProgress( 10 );
 
   scene.clear( );
-  dom_map_name.innerText = file.name;
-  dom_texture_showcase.innerHTML = "";
+  setMapName( file.name );
+  clearTextures( );
   loadMap( );
 }
 
@@ -721,7 +657,7 @@ async function wadFileChange( e ) {
     return;
   }
 
-  dom_wad_name.innerText = file.name;
+  setWadName( file.name );
   wad_data = await file.arrayBuffer( );
 }
 
@@ -731,11 +667,9 @@ function selectChangeMap( e ) {
   if ( selection === "File Upload" || selection === prev_map_selection )
     return;
 
-  if ( dom_wireframe && dom_wireframe.checked )
-    dom_wireframe.checked = false;
-
   scene.clear( );
-  dom_texture_showcase.innerHTML = "";
+  clearTextures( );
+  setWireframeOff( );
   prev_map_selection = e.target.value;
   Promise.resolve( loadDefaultMap( e.target.value ) );
 }
@@ -748,20 +682,26 @@ function toggleWireframe( e ) {
     }
   });
 }
+
+function clickWireframe( ) {
+  if ( !dom_wireframe )
+    return;
+
+  dom_wireframe.click( );
+}
+
+function setWireframeOff( ) {
+  if ( !dom_wireframe )
+    return;
+
+  dom_wireframe.checked = false;
+}
 //#endregion
 
 //#region Events
 document.addEventListener( "DOMContentLoaded", async ( ) => {
-  dom_progress = document.getElementById( 'progress' );
-  setProgress( 0 );
-
-  dom_texture_showcase = document.getElementById( 'side_collapsible_section' );
-  dom_settings = document.getElementById( 'bottom_collapsible_section' );
   dom_map_picker = document.getElementById( 'map_picker' );
   dom_wireframe = document.getElementById( 'wireframe' );
-  dom_map_name = document.getElementById( 'map_name' );
-  dom_wad_name = document.getElementById( 'wad_name' );
-  dom_error = document.getElementById( 'error' );
 
   document.getElementById( 'bottom_collapsible_btn' ).onclick = toggleBottomCollapsibleSection;
   document.getElementById( 'side_collapsible_btn' ).onclick = toggleSideCollapsibleSection;
@@ -778,13 +718,10 @@ document.addEventListener( "DOMContentLoaded", async ( ) => {
 });
 
 onkeyup = ( e ) => {
-  if ( !dom_wireframe )
-    return;
-
   if ( e.key !== 'x' )
     return;
 
-  dom_wireframe.click( );
+  clickWireframe( );
 };
 
 onkeydown = ( e ) => {

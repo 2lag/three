@@ -1,8 +1,9 @@
 ### todo
  - fix then animate progress bar
    - portion in parseMap is not working because of busy thread, fix this somehow without retard async forced slowdown bullshit
+     - maybe webworker that gets report of progress status and updates dom on it's own? unless more efficient method would be to parse map with webworker... tbd
 
- - fix texture offsets / scaling, still not 100% correct ( on quake maps only i think, but maybe both. )
+ - fix texture offsets / scaling, still not 100% correct ( on quake maps only i think, but maybe both. verify with trenchbroom / J.A.C.K. )
 
  - make loading/parsing & running faster
    - more async ?
