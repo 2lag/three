@@ -1,17 +1,13 @@
 ### todo
- - fix then animate progress bar
-   - portion in parseMap is not working because of busy thread, fix this somehow without retard async forced slowdown bullshit
-     - maybe webworker that gets report of progress status and updates dom on it's own? unless more efficient method would be to parse map with webworker... tbd
-
- - fix texture offsets / scaling, still not 100% correct ( on quake maps only i think, but maybe both. verify with trenchbroom / J.A.C.K. )
-
- - make loading/parsing & running faster
-   - more async ?
-   - profile site w ff dev ed
+ - fix texture offsets / scaling, still not 100% correct ( ONLY ON QUAKE NOW, VALVE IS FIXED )
 
  - make better movement controller that incorporates delta time AND works w touch controls ( mayb onscreen ? idk )
    - unless its okay on mobile ( this should be tested alr )
    - if it doesn't work well, copy [this](https://github.com/sbuggay/bspview/blob/master/src/CameraControls.ts) and add onscreen control/joystick as well as keybound ctls
+
+ - make loading/parsing & running faster
+   - profile site w ff dev ed
+   - more async ? or is that the issue .. . .
 
  - add hideable keybind list somewhere ( top / bottom right )
 
@@ -21,12 +17,10 @@
    - split up into files more, util file, etc
    - if possible make progress functionality cleaner w/o hardcode vals
 
- - remove any remaining comments
-
- - add more maps ? ( potentially [portal](https://valvearchive.com/archive/Other%20Files/Leaks/2016%20-%20Facepunch%20and%20VCC%20leaks/Files/Portal/)-exported vmfs as .maps ? )
-
  - make ui actually look like goldsrc w [this](https://github.com/x8BitRain/webhl) && [this](https://github.com/x8BitRain/webhl/blob/master/src/css/greensteam.css)
+
+ - go thru any remaining comments
 
  - integrate to kuso.day/map.html
 
- - get back to fpsic proj w/ [this help](https://github.com/sbuggay/bspview/blob/master/spec/hlbsp.md)
+ - get back to fpsic proj w/ [this project](https://github.com/2lag/three) & [this help](https://github.com/sbuggay/bspview/blob/master/spec/hlbsp.md) & also [this help](https://valvedev.info/guides/accelerating-map-compiles-in-quake-based-engines/) & [this](https://valvedev.info/guides/what-goes-into-compiling-a-source-map/)... basically anything [here](https://valvedev.info/guides/)

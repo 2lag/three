@@ -9,15 +9,20 @@ function setProgress( val ) {
   if ( !dom_progress || typeof val !== "number" )
     return;
 
+  const value = Math.round( val );
+
   dom_progress.style.display = "block";
-  dom_progress.value = Math.round( val );
+  dom_progress.value = value;
+
+  if ( value === 100 )
+    setTimeout( ( ) => { dom_progress.style.display = "none"; }, 50 );
 }
 
 function getProgress( ) {
   if ( !dom_progress )
     return 0;
 
-  return Number( dom_progress.value );
+  return dom_progress.value;
 }
 
 function hideProgress( ) {

@@ -25,13 +25,12 @@ const quake_palette = getQuakePalette( );
 const HALF_PI = Math.PI * 0.5;
 const FULLBRIGHT_IDX = 0xE0;
 const UPDATE_TIME = 1 / 20;
+const PROGRESS_STEPS = 10;
 const FLT_EPSILON = 1e-6;
 
 let dom_map_picker, dom_wireframe;
 let map_data = "", wad_data = "";
 
-const tan010 = new THREE.Vector3( 0, 1, 0 );
-const tan100 = new THREE.Vector3( 1, 0, 0 );
 const ci_term0 = new THREE.Vector3( );
 const ci_term1 = new THREE.Vector3( );
 const ci_term2 = new THREE.Vector3( );
@@ -42,6 +41,7 @@ const scene = new THREE.Scene( );
 const v0 = new THREE.Vector3( );
 const v1 = new THREE.Vector3( );
 const v2 = new THREE.Vector3( );
+const uv = new THREE.Vector3( );
 let controls;
 let renderer;
 let cam;
@@ -112,17 +112,17 @@ function computeIntersection( p0, p1, p2 ) {
 
 function isPointInsideBrush( point, planes ) {
   for ( let p_idx = 0; p_idx < planes.length; ++p_idx ) {
-    const plane = planes[ p_idx ];
+    const d = planes[ p_idx ].distanceToPoint( point );
 
-    if ( plane.distanceToPoint( point ) >= -0.001 )
-      continue;
-
-    return false;
+    if ( d >= 0.0001 )
+      return false;
   }
 
   return true;
 }
 
+const tan010 = new THREE.Vector3( 0, 1, 0 );
+const tan100 = new THREE.Vector3( 1, 0, 0 );
 function getUVAxis( normal ) {
   let tangent = ( Math.abs( normal.dot( tan010 ) ) > 0.99 ) ? tan100 : tan010;
   u_vec3.crossVectors( normal, tangent ).normalize( );
@@ -130,30 +130,45 @@ function getUVAxis( normal ) {
 }
 
 function computeUVForVertex( vertex, line_data, texture ) {
-  const angle = THREE.MathUtils.degToRad( line_data.rotation );
-  const cos = Math.cos( angle );
-  const sin = Math.sin( angle );
-
   let uv_offset;
+
   if ( line_data.type === "VALVE" ) {
     u_vec3.set( line_data.u.x, line_data.u.y, line_data.u.z );
     v_vec3.set( line_data.v.x, line_data.v.y, line_data.v.z );
     uv_offset = new THREE.Vector2( line_data.u.w, line_data.v.w );
+    
+    uv.set(
+      vertex.dot( u_vec3 ) / line_data.uv_scale.x + uv_offset.x,
+      vertex.dot( v_vec3 ) / line_data.uv_scale.y + uv_offset.y,
+    );
   } else {
+    // this section for quake UVs is wrong
+    //  some rotations are off ( not computing uv axis correctly i think )
+    //  some, maybe all offests are also off
+    //  scaling seems to be good though as far as i'm aware
+
     getUVAxis( line_data.plane.normal );
     uv_offset = line_data.uv_offset;
+
+    const rotation = THREE.MathUtils.degToRad( line_data.rotation );
+    const cos = Math.cos( rotation );
+    const sin = Math.sin( rotation );
+
+    let rotated_u = u_vec3.clone( ).multiplyScalar( cos ).add( v_vec3.clone( ).multiplyScalar( -sin ) );
+    let rotated_v = u_vec3.clone( ).multiplyScalar( sin ).add( v_vec3.clone( ).multiplyScalar(  cos ) );
+
+    uv.set(
+      vertex.dot( rotated_u ) * line_data.uv_scale.x + uv_offset.y,
+      vertex.dot( rotated_v ) * line_data.uv_scale.y + uv_offset.x
+    );
   }
 
-  const rotated_u = u_vec3.clone( ).multiplyScalar( cos ).add( v_vec3.clone( ).multiplyScalar( -sin ) );
-  const rotated_v = u_vec3.clone( ).multiplyScalar( sin ).add( v_vec3.clone( ).multiplyScalar(  cos ) );
-
-  const u = vertex.dot( rotated_u ) * ( 1 / line_data.uv_scale.x ) + uv_offset.x;
-  const v = vertex.dot( rotated_v ) * ( 1 / line_data.uv_scale.y ) + uv_offset.y;
-  
-  return new THREE.Vector2(
-    u / texture.image.width,
-    v / texture.image.height
+  uv.set(
+    uv.x / texture.image.width,
+    uv.y / texture.image.height
   );
+
+  return uv;
 }
 
 function createFaceGeometry( verts, face_data, texture ) {
@@ -177,7 +192,6 @@ function createFaceGeometry( verts, face_data, texture ) {
   
   for ( let t_idx = 0; t_idx < triangles.length; ++t_idx ) {
     const tri = triangles[ t_idx ];
-    
     indices.push( tri[0], tri[1], tri[2] );
   }
   
@@ -234,9 +248,11 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   for ( let idx = 0; idx < data.length; ++idx ) {
     const palette_idx = data[ idx ];
 
+    /* render special colors properly ( just fix quake palette i think ? )
     let alpha = 255;
     if ( !is_valve_fmt && palette_idx >= FULLBRIGHT_IDX )
       alpha = 0;
+    */
 
     const [ r, g, b ] = palette[ palette_idx ];
     const i = idx * 4;
@@ -244,7 +260,7 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
     img_data.data[ i + 0 ] = r;
     img_data.data[ i + 1 ] = g;
     img_data.data[ i + 2 ] = b;
-    img_data.data[ i + 3 ] = alpha;
+    img_data.data[ i + 3 ] = 255;
   }
 
   ctx.putImageData( img_data, 0, 0 );
@@ -266,11 +282,6 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   texture.flipY = false;
 
   return texture;
-}
-
-function setCamPos( x, y, z ) {
-  cam.rotation.set( 0, HALF_PI, HALF_PI );
-  cam.position.set( x, y, z );
 }
 
 function computeBrushVertices( planes ) {
@@ -299,7 +310,12 @@ function computeBrushVertices( planes ) {
   return verts;
 }
 
-function parseMap( is_valve_fmt, wad ) {
+function setCamPos( x, y, z ) {
+  cam.rotation.set( 0, HALF_PI, HALF_PI );
+  cam.position.set( x, y, z );
+}
+
+async function parseMap( is_valve_fmt, wad ) {
   let unique_textures = new Set( );
   const map = new THREE.Group( );
   let texture_list = new Map( );
@@ -309,13 +325,24 @@ function parseMap( is_valve_fmt, wad ) {
                     .split( "{" )
                     .map( b => b.trim( ) )
                     .filter( b => b );
-
+                    
+  let updates = 0;
   let progress_track = getProgress( );
   const delta_progress = 95 - progress_track;
-  const block_delta = delta_progress / blocks.length;
-  for ( let b_idx = 0; b_idx < blocks.length; ++b_idx ) {
+  const update_interval = Math.ceil( blocks.length / PROGRESS_STEPS );
+  const block_delta = delta_progress / update_interval;
+
+  const updateProgress = async ( ) => {
     progress_track += block_delta;
     setProgress( progress_track );
+    await new Promise( r => setTimeout( r, 0 ) );
+  }
+
+  for ( let b_idx = 0; b_idx < blocks.length; ++b_idx ) {
+    if ( !( b_idx % update_interval ) && updates < PROGRESS_STEPS ) {
+      await updateProgress( );
+      ++updates;
+    }
 
     const block = blocks[ b_idx ];
     const face_data = [ ];
@@ -355,7 +382,8 @@ function parseMap( is_valve_fmt, wad ) {
       if ( !line_data )
         continue;
 
-      line_data.plane = new THREE.Plane( ).setFromCoplanarPoints( line_data.v0, line_data.v1, line_data.v2 );
+      /* account for default winding */
+      line_data.plane = new THREE.Plane( ).setFromCoplanarPoints( line_data.v0, line_data.v2, line_data.v1 );
       face_data.push( line_data );
     }
 
@@ -420,7 +448,7 @@ function parseMap( is_valve_fmt, wad ) {
       const merged_geoms = BufferGeometryUtils.mergeGeometries( geoms, true );
       const texture = texture_list.get( tex_name );
       const face_mtl = new THREE.MeshBasicMaterial({
-        side: THREE.BackSide,
+        side: THREE.FrontSide,
         map: texture
       });
 
@@ -495,7 +523,6 @@ async function loadDefaultMap( map ) {
     else ret = false;
   } catch ( err ) {
     hideProgress( );
-    
     setErrorMessage( "Failed to load default map:", err );
     ret = false;
   }
@@ -509,9 +536,7 @@ function loadMap( ) {
 
   setProgress( 20 );
 
-  const ret = parseMap( valve_map, wad );
-  hideProgress( );
-  return ret;
+  return Promise.resolve( parseMap( valve_map, wad ) );
 }
 
 async function init( ) {
