@@ -10,8 +10,7 @@ import {
   sortTexturesById,
   setHudNames, getWadName, setWadName, setMapName,
   appendTexture, clearTextures,
-  setTextureShowcaseHeight,
-  toggleTextureShowcase,
+  setTextureShowcaseHeight, toggleTextureShowcase,
   toggleSettings, isSettingsActive
 } from './js/DOMUtil.js';
 
@@ -121,10 +120,10 @@ function isPointInsideBrush( point, planes ) {
   return true;
 }
 
-const tan010 = new THREE.Vector3( 0, 1, 0 );
+const tan001 = new THREE.Vector3( 0, 0, 1 );
 const tan100 = new THREE.Vector3( 1, 0, 0 );
 function getUVAxis( normal ) {
-  let tangent = ( Math.abs( normal.dot( tan010 ) ) > 0.99 ) ? tan100 : tan010;
+  let tangent = ( Math.abs( normal.dot( tan001 ) ) > 0.99 ) ? tan100 : tan001;
   u_vec3.crossVectors( normal, tangent ).normalize( );
   v_vec3.crossVectors( normal, u_vec3  ).normalize( );
 }
@@ -142,11 +141,6 @@ function computeUVForVertex( vertex, line_data, texture ) {
       vertex.dot( v_vec3 ) / line_data.uv_scale.y + uv_offset.y,
     );
   } else {
-    // this section for quake UVs is wrong
-    //  some rotations are off ( not computing uv axis correctly i think )
-    //  some, maybe all offests are also off
-    //  scaling seems to be good though as far as i'm aware
-
     getUVAxis( line_data.plane.normal );
     uv_offset = line_data.uv_offset;
 
@@ -154,12 +148,12 @@ function computeUVForVertex( vertex, line_data, texture ) {
     const cos = Math.cos( rotation );
     const sin = Math.sin( rotation );
 
-    let rotated_u = u_vec3.clone( ).multiplyScalar( cos ).add( v_vec3.clone( ).multiplyScalar( -sin ) );
-    let rotated_v = u_vec3.clone( ).multiplyScalar( sin ).add( v_vec3.clone( ).multiplyScalar(  cos ) );
+    let rotated_u = u_vec3.clone( ).multiplyScalar(  cos ).add( v_vec3.clone( ).multiplyScalar( sin ) );
+    let rotated_v = u_vec3.clone( ).multiplyScalar( -sin ).add( v_vec3.clone( ).multiplyScalar( cos ) );
 
     uv.set(
-      vertex.dot( rotated_u ) * line_data.uv_scale.x + uv_offset.y,
-      vertex.dot( rotated_v ) * line_data.uv_scale.y + uv_offset.x
+      vertex.dot( rotated_u ) * line_data.uv_scale.x + uv_offset.x,
+      vertex.dot( rotated_v ) * line_data.uv_scale.y + uv_offset.y
     );
   }
 
@@ -248,11 +242,10 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   for ( let idx = 0; idx < data.length; ++idx ) {
     const palette_idx = data[ idx ];
 
-    /* render special colors properly ( just fix quake palette i think ? )
+    // render special colors properly ( just fix quake palette i think ? idfk )
     let alpha = 255;
     if ( !is_valve_fmt && palette_idx >= FULLBRIGHT_IDX )
       alpha = 0;
-    */
 
     const [ r, g, b ] = palette[ palette_idx ];
     const i = idx * 4;
@@ -260,7 +253,7 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
     img_data.data[ i + 0 ] = r;
     img_data.data[ i + 1 ] = g;
     img_data.data[ i + 2 ] = b;
-    img_data.data[ i + 3 ] = 255;
+    img_data.data[ i + 3 ] = alpha;
   }
 
   ctx.putImageData( img_data, 0, 0 );

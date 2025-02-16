@@ -1,5 +1,6 @@
 ### todo
- - fix texture offsets / scaling, still not 100% correct ( ONLY ON QUAKE NOW, VALVE IS FIXED )
+ - fix texture offsets, still not 100% correct ( ONLY ON QUAKE NOW, VALVE IS FIXED )
+   - x is inverted, some offsets, NOT ALL, are wrong
 
  - make better movement controller that incorporates delta time AND works w touch controls ( mayb onscreen ? idk )
    - unless its okay on mobile ( this should be tested alr )
