@@ -121,39 +121,35 @@ function isPointInsideBrush( point, planes ) {
 }
 
 const tan001 = new THREE.Vector3( 0, 0, 1 );
-const tan100 = new THREE.Vector3( 1, 0, 0 );
+const tan010 = new THREE.Vector3( 0, 1, 0 );
 function getUVAxis( normal ) {
-  let tangent = ( Math.abs( normal.dot( tan001 ) ) > 0.99 ) ? tan100 : tan001;
+  let tangent = ( Math.abs( normal.dot( tan001 ) ) > 0.99 ) ? tan010 : tan001;
   u_vec3.crossVectors( normal, tangent ).normalize( );
   v_vec3.crossVectors( normal, u_vec3  ).normalize( );
 }
 
 function computeUVForVertex( vertex, line_data, texture ) {
-  let uv_offset;
-
   if ( line_data.type === "VALVE" ) {
     u_vec3.set( line_data.u.x, line_data.u.y, line_data.u.z );
     v_vec3.set( line_data.v.x, line_data.v.y, line_data.v.z );
-    uv_offset = new THREE.Vector2( line_data.u.w, line_data.v.w );
     
     uv.set(
-      vertex.dot( u_vec3 ) / line_data.uv_scale.x + uv_offset.x,
-      vertex.dot( v_vec3 ) / line_data.uv_scale.y + uv_offset.y,
+      vertex.dot( u_vec3 ) / line_data.uv_scale.x + line_data.u.w,
+      vertex.dot( v_vec3 ) / line_data.uv_scale.y + line_data.v.w,
     );
   } else {
     getUVAxis( line_data.plane.normal );
-    uv_offset = line_data.uv_offset;
 
     const rotation = THREE.MathUtils.degToRad( line_data.rotation );
     const cos = Math.cos( rotation );
     const sin = Math.sin( rotation );
 
-    let rotated_u = u_vec3.clone( ).multiplyScalar(  cos ).add( v_vec3.clone( ).multiplyScalar( sin ) );
-    let rotated_v = u_vec3.clone( ).multiplyScalar( -sin ).add( v_vec3.clone( ).multiplyScalar( cos ) );
+    let rotated_u = u_vec3.clone( ).multiplyScalar( cos ).sub( v_vec3.clone( ).multiplyScalar( sin ) );
+    let rotated_v = u_vec3.clone( ).multiplyScalar( sin ).add( v_vec3.clone( ).multiplyScalar( cos ) );
 
     uv.set(
-      vertex.dot( rotated_u ) * line_data.uv_scale.x + uv_offset.x,
-      vertex.dot( rotated_v ) * line_data.uv_scale.y + uv_offset.y
+      vertex.dot( rotated_u ) * line_data.uv_scale.x + line_data.uv_offset.x,
+      vertex.dot( rotated_v ) * line_data.uv_scale.y + line_data.uv_offset.y
     );
   }
 
@@ -198,7 +194,8 @@ function createFaceGeometry( verts, face_data, texture ) {
   return geometry;
 }
 
-function getFacePolygon( plane, verts ) {
+function getFacePolygon( fd, verts ) {
+  const plane = fd.plane;
   const tol = 0.001;
 
   let face_verts = verts.filter( v => Math.abs( plane.distanceToPoint( v ) ) < tol );
@@ -403,7 +400,7 @@ async function parseMap( is_valve_fmt, wad ) {
     for ( let f_idx = 0; f_idx < face_data.length; ++f_idx ) {
       const fd = face_data[ f_idx ];
 
-      const face_verts = getFacePolygon( fd.plane, vertices );
+      const face_verts = getFacePolygon( fd, vertices );
 
       if ( !face_verts || face_verts.length < 3 ) {
         console.error( "failed to compute face polygon for face:", fd );
