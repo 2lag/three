@@ -1,6 +1,7 @@
 ### todo
  - fix textures, still not 100% correct ( ONLY ON LIKE HALF OF QUAKE FACES )
-   - x is inverted on some faces, and some offsets -- NOT ALL -- are wrong
+   - a single offset is wrong somehow. i have to be pulling a stupid somewhere.
+   - [here](https://github.com/TrenchBroom/TrenchBroom/blob/master/common/src/mdl/UVCoordSystem.h) || [here](https://github.com/TrenchBroom/TrenchBroom/blob/master/common/src/mdl/MapFormat.cpp)
 
  - make better movement controller that incorporates delta time AND works w touch controls ( mayb onscreen ? idk )
    - unless its okay on mobile ( this should be tested alr )

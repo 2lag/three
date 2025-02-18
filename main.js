@@ -129,29 +129,31 @@ function getUVAxis( normal ) {
 }
 
 function computeUVForVertex( vertex, line_data, texture ) {
+  let uv_offset;
+
   if ( line_data.type === "VALVE" ) {
     u_vec3.set( line_data.u.x, line_data.u.y, line_data.u.z );
     v_vec3.set( line_data.v.x, line_data.v.y, line_data.v.z );
     
-    uv.set(
-      vertex.dot( u_vec3 ) / line_data.uv_scale.x + line_data.u.w,
-      vertex.dot( v_vec3 ) / line_data.uv_scale.y + line_data.v.w,
-    );
+    uv_offset = new THREE.Vector2( line_data.u.w, line_data.v.w );
+
   } else {
     getUVAxis( line_data.plane.normal );
+    uv_offset = line_data.uv_offset;
+    u_vec3.negate( ); // find a way to avoid this bruteforce fix since there is still a single incorrect offset, it means i'm doing something wrong in this file.
 
     const rotation = THREE.MathUtils.degToRad( line_data.rotation );
     const cos = Math.cos( rotation );
     const sin = Math.sin( rotation );
 
-    let rotated_u = u_vec3.clone( ).multiplyScalar( cos ).sub( v_vec3.clone( ).multiplyScalar( sin ) );
-    let rotated_v = u_vec3.clone( ).multiplyScalar( sin ).add( v_vec3.clone( ).multiplyScalar( cos ) );
-
-    uv.set(
-      vertex.dot( rotated_u ) * line_data.uv_scale.x + line_data.uv_offset.x,
-      vertex.dot( rotated_v ) * line_data.uv_scale.y + line_data.uv_offset.y
-    );
+    u_vec3.copy( u_vec3.clone( ).multiplyScalar( cos ).sub( v_vec3.clone( ).multiplyScalar( -sin ) ) );
+    v_vec3.copy( u_vec3.clone( ).multiplyScalar( sin ).add( v_vec3.clone( ).multiplyScalar( cos ) ) );
   }
+  
+  uv.set(
+    vertex.dot( u_vec3 ) / line_data.uv_scale.x + uv_offset.x,
+    vertex.dot( v_vec3 ) / line_data.uv_scale.y + uv_offset.y
+  );
 
   uv.set(
     uv.x / texture.image.width,
