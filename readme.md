@@ -1,17 +1,19 @@
 ### todo
- - fix textures, still not 100% correct ( ONLY ON LIKE HALF OF QUAKE FACES )
-   - a single offset is wrong somehow. i have to be pulling a stupid somewhere.
+ - fix textures, still not 100% correct ( ONLY ON LIKE SOME QUAKE FACES )
+   - all seem to be inverted horizontally, and some seem to be offset improperly, but trenchbroom has no issue rendering so i don't know where the problem lies
    - [here](https://github.com/TrenchBroom/TrenchBroom/blob/master/common/src/mdl/UVCoordSystem.h) || [here](https://github.com/TrenchBroom/TrenchBroom/blob/master/common/src/mdl/MapFormat.cpp)
+
+ - remove Promise.* and use async ?
+   - just go through all comments
 
  - make better movement controller that incorporates delta time AND works w touch controls ( mayb onscreen ? idk )
    - unless its okay on mobile ( this should be tested alr )
    - if it doesn't work well, copy [this](https://github.com/sbuggay/bspview/blob/master/src/CameraControls.ts) and add onscreen control/joystick as well as keybound ctls
 
+ - add hideable keybind list somewhere ( top / bottom right )
+
  - make loading/parsing & running faster
    - profile site w ff dev ed
-   - more async ? or is that the issue .. . .
-
- - add hideable keybind list somewhere ( top / bottom right )
 
  - clean all this fucking code its a mess ( split up the functionality as much as possible )
    - no functions longer than 60 lines, no wider than 80-90 chars

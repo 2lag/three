@@ -120,33 +120,35 @@ function isPointInsideBrush( point, planes ) {
   return true;
 }
 
-const tan001 = new THREE.Vector3( 0, 0, 1 );
-const tan010 = new THREE.Vector3( 0, 1, 0 );
+const TAN_001 = new THREE.Vector3( 0, 0, 1 );
+const TAN_010 = new THREE.Vector3( 0, 1, 0 );
 function getUVAxis( normal ) {
-  let tangent = ( Math.abs( normal.dot( tan001 ) ) > 0.99 ) ? tan010 : tan001;
+  let tangent = ( Math.abs( normal.dot( TAN_001 ) ) > 0.99 ) ? TAN_010 : TAN_001;
   u_vec3.crossVectors( normal, tangent ).normalize( );
   v_vec3.crossVectors( normal, u_vec3  ).normalize( );
 }
 
+/*
+In the original Quake engine, materials are projected onto brush faces along the axes of the coordinate system. In practice, the engine (the compiler, to be precise), uses the normal of a brush face to determine the projection axis - the chose axis is the one that has the smallest angle with the face’s normal. Then, the material is projected onto the brush face along that axis. This leads to some distortion (shearing) that is particularly apparent for slanted brush faces where the face’s normal is linearly dependent on all three coordinate system axes. However, this type of projection, which we call paraxial projection in TrenchBroom, also has an advantage: If the face’s normal is linearly dependent on only two or less coordinate system axes (that is, it lies in the plane defined by two of the axes, e.g., the XY plane), then the paraxial projection ensures that the material still fits the brush faces without having to change the scaling factors.
+The main disadvantage of paraxial projection is that it is impossible to do perfect alignment locking. Alignment locking means that the material remains perfectly in place on the brush faces during all transformations of the face. For example, if the brush moves by 16 units along the X axis, then the materials on all faces of the brush do not move relatively to the brush. With paraxial projection, materials may become distorted due to the face normals changing by the transformation, but it is impossible to compensate for that shearing.
+This is (probably) one of the reasons why the Valve 220 map format was introduced for Half Life. This map format extends the brush faces with additional information about the UV axes for each brush faces. In principle, this makes it possible to have arbitrary linear transformations for the UV coordinates due to their projection, but in practice, most editors keep the UV axes perpendicular to the face normals. In that case, the material is projected onto the face along the normal of the face (and not a coordinate system axis). In TrenchBroom, this mode of projection is called parallel projection, and it is only available in maps that have the Valve 220 map format.
+*/
 function computeUVForVertex( vertex, line_data, texture ) {
   let uv_offset;
 
   if ( line_data.type === "VALVE" ) {
+    uv_offset = new THREE.Vector2( line_data.u.w, line_data.v.w );
     u_vec3.set( line_data.u.x, line_data.u.y, line_data.u.z );
     v_vec3.set( line_data.v.x, line_data.v.y, line_data.v.z );
-    
-    uv_offset = new THREE.Vector2( line_data.u.w, line_data.v.w );
-
   } else {
     getUVAxis( line_data.plane.normal );
     uv_offset = line_data.uv_offset;
-    u_vec3.negate( ); // find a way to avoid this bruteforce fix since there is still a single incorrect offset, it means i'm doing something wrong in this file.
 
     const rotation = THREE.MathUtils.degToRad( line_data.rotation );
     const cos = Math.cos( rotation );
     const sin = Math.sin( rotation );
 
-    u_vec3.copy( u_vec3.clone( ).multiplyScalar( cos ).sub( v_vec3.clone( ).multiplyScalar( -sin ) ) );
+    u_vec3.copy( u_vec3.clone( ).multiplyScalar( cos ).sub( v_vec3.clone( ).multiplyScalar( sin ) ) );
     v_vec3.copy( u_vec3.clone( ).multiplyScalar( sin ).add( v_vec3.clone( ).multiplyScalar( cos ) ) );
   }
   
@@ -159,8 +161,6 @@ function computeUVForVertex( vertex, line_data, texture ) {
     uv.x / texture.image.width,
     uv.y / texture.image.height
   );
-
-  return uv;
 }
 
 function createFaceGeometry( verts, face_data, texture ) {
@@ -176,8 +176,7 @@ function createFaceGeometry( verts, face_data, texture ) {
   for ( let v_idx = 0; v_idx < verts.length; ++v_idx ) {
     const vert = verts[ v_idx ];
 
-    const uv = computeUVForVertex( vert, face_data, texture );
-
+    computeUVForVertex( vert, face_data, texture );
     positions.push( vert.x, vert.y, vert.z );
     uvs.push( uv.x, uv.y );
   }
@@ -191,7 +190,6 @@ function createFaceGeometry( verts, face_data, texture ) {
   geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
   geometry.setAttribute( 'uv', new THREE.Float32BufferAttribute( uvs, 2 ) );
   geometry.setIndex( indices );
-
   geometry.computeVertexNormals( );
   return geometry;
 }
@@ -208,13 +206,10 @@ function getFacePolygon( fd, verts ) {
   getUVAxis( plane.normal );
   
   let center = new THREE.Vector2( 0, 0 );
-  const face_verts_2d = face_verts.map( v => {
-    return new THREE.Vector2( v.dot( u_vec3 ), v.dot( v_vec3 ) );
-  });
+  const face_verts_2d = face_verts.map( v => new THREE.Vector2( v.dot( u_vec3 ), v.dot( v_vec3 ) ) );
 
   for ( let f_idx = 0; f_idx < face_verts_2d.length; ++f_idx )
     center.add( face_verts_2d[ f_idx ] );
-
   center.divideScalar( face_verts_2d.length );
 
   face_verts.sort( ( a, b ) => {
@@ -227,7 +222,7 @@ function getFacePolygon( fd, verts ) {
 }
 
 function createTextureFromMip( mip_tex, is_valve_fmt ) {
-  const palette = ( is_valve_fmt ) ? mip_tex.palette : quake_palette;
+  const palette = is_valve_fmt ? mip_tex.palette : quake_palette;
   const { name, width, height, data } = mip_tex;
 
   const canvas = document.createElement( "canvas" );
@@ -241,7 +236,7 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   for ( let idx = 0; idx < data.length; ++idx ) {
     const palette_idx = data[ idx ];
 
-    // render special colors properly ( just fix quake palette i think ? idfk )
+    // TODO : render special colors properly ( just fix quake palette i think ? idfk )
     let alpha = 255;
     if ( !is_valve_fmt && palette_idx >= FULLBRIGHT_IDX )
       alpha = 0;
@@ -277,22 +272,16 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
 }
 
 function computeBrushVertices( planes ) {
-  const len = planes.length;
   const verts = [ ];
-
+  const len = planes.length;
   for ( let i0 = 0; i0 < len; ++i0 ) {
     for ( let i1 = i0 + 1; i1 < len; ++i1 ) {
       for ( let i2 = i1 + 1; i2 < len; ++i2 ) {
         const pt = computeIntersection( planes[ i0 ], planes[ i1 ], planes[ i2 ] );
 
-        if ( !pt )
-          continue;
-
-        if ( !isPointInsideBrush( pt, planes ) )
-          continue;
-
-        if ( verts.some( v => v.distanceToSquared( pt ) < FLT_EPSILON ) )
-          continue;
+        if ( !pt ) continue;
+        if ( !isPointInsideBrush( pt, planes ) ) continue;
+        if ( verts.some( v => v.distanceToSquared( pt ) < FLT_EPSILON ) ) continue;
 
         verts.push( pt );
       }
@@ -308,15 +297,14 @@ function setCamPos( x, y, z ) {
 }
 
 async function parseMap( is_valve_fmt, wad ) {
-  let unique_textures = new Set( );
+  const unique_textures = new Set( );
   const map = new THREE.Group( );
-  let texture_list = new Map( );
+  const texture_list = new Map( );
   let spawn_found = false;
 
   const blocks = map_data.split( "}" ).join( "" )
                     .split( "{" )
-                    .map( b => b.trim( ) )
-                    .filter( b => b );
+                    .map( b => b.trim( ) ).filter( b => b );
                     
   let updates = 0;
   let progress_track = getProgress( );
@@ -336,12 +324,9 @@ async function parseMap( is_valve_fmt, wad ) {
       ++updates;
     }
 
-    const block = blocks[ b_idx ];
     const face_data = [ ];
-
-    const lines = block.split( "\n" )
-                       .map( l => l.trim( ) )
-                       .filter( l => l );
+    const block = blocks[ b_idx ];
+    const lines = block.split( "\n" ).map( l => l.trim( ) ).filter( l => l );
 
     for ( let l_idx = 0; l_idx < lines.length; ++l_idx ) {
       const line = lines[ l_idx ];
@@ -387,18 +372,14 @@ async function parseMap( is_valve_fmt, wad ) {
       continue;
     }
 
-    const vertices = computeBrushVertices(
-      face_data.map( fd => fd.plane )
-    );
-
+    const vertices = computeBrushVertices( face_data.map( fd => fd.plane ) );
     if ( !vertices.length ) {
       console.error( "no vertices computed for brush" );
       continue;
     }
 
-    const brushes = new THREE.Group( );
     const geometries = new Map( );
-
+    const brushes = new THREE.Group( );
     for ( let f_idx = 0; f_idx < face_data.length; ++f_idx ) {
       const fd = face_data[ f_idx ];
 
@@ -412,7 +393,6 @@ async function parseMap( is_valve_fmt, wad ) {
       if ( !texture_list.has( fd.texture ) ) {
         if ( !unique_textures.has( fd.texture ) ) {
           const matching_texture = wad.extractTextureFromName( fd.texture, is_valve_fmt );
-
           if ( !matching_texture ) {
             console.error( `failed to find texture '${ fd.texture }' in wad dir` );
             continue;
@@ -453,16 +433,12 @@ async function parseMap( is_valve_fmt, wad ) {
   
   sortTexturesById( );
   scene.add( map );
-  
   setProgress( 100 );
-
   return true;
 }
 
 function extractFirstWadName( ) {
-  const lines = map_data.split( "\n" )
-                        .map( l => l.trim( ) )
-                        .filter( l => l.length );
+  const lines = map_data.split( "\n" ).map( l => l.trim( ) ).filter( l => l.length );
 
   for ( let l_idx = 0; l_idx < lines.length; ++l_idx ) {
     const line = lines[ l_idx ];
@@ -472,18 +448,23 @@ function extractFirstWadName( ) {
 
     const match = line.match( wad_regex );
     
-    if ( !match )
-      continue;
-
-    return match[ 1 ];
+    if ( match )
+      return match[ 1 ];
   }
-
   return null;
 }
 
-async function loadDefaultMap( map ) {
-  let ret = true;
+// TODO : make async
+function loadMap( ) {
+  const valve_map = map_data.includes( "[" ) || map_data.includes( "]" );
+  const wad = loadWad( );
 
+  setProgress( 20 );
+
+  return Promise.resolve( parseMap( valve_map, wad ) );
+}
+
+async function loadDefaultMap( map ) {
   try {
     const map_file = await fetch( map );
 
@@ -506,29 +487,21 @@ async function loadDefaultMap( map ) {
 
     setProgress( 15 );
 
-    if ( loadMap( ) ) {
+    const loaded = loadMap( );
+    
+    if ( loaded ) {
       setHudNames(
         map.split( "/" ).slice( -1 )[ 0 ],
         wad_name.split( "/" ).slice( -1 )[ 0 ]
       );
     }
-    else ret = false;
+    
+    return loaded;
   } catch ( err ) {
     hideProgress( );
     setErrorMessage( "Failed to load default map:", err );
-    ret = false;
+    return false;
   }
-
-  return ret;
-}
-
-function loadMap( ) {
-  const valve_map = map_data.includes( "[" ) || map_data.includes( "]" );
-  const wad = loadWad( );
-
-  setProgress( 20 );
-
-  return Promise.resolve( parseMap( valve_map, wad ) );
 }
 
 async function init( ) {
@@ -575,8 +548,8 @@ function toggleBottomCollapsibleSection( e ) {
   else
     setTextureShowcaseHeight( "100%" );
 
-  btn.innerText = ( !btn.classList.contains( 'active' ) ) ? '+' : '-';
-  btn.style.bottom = ( !btn.classList.contains( 'active' ) ) ? "8px" : "136px";
+  btn.innerText = btn.classList.contains( 'active' ) ? '-' : '+';
+  btn.style.bottom = btn.classList.contains( 'active' ) ? "136px" : "8px";
 }
 
 function toggleSideCollapsibleSection( e ) {
@@ -585,21 +558,19 @@ function toggleSideCollapsibleSection( e ) {
   toggleTextureShowcase( );
   btn.classList.toggle( 'active' );
   
-  btn.innerText = ( !btn.classList.contains( 'active' ) ) ? '+' : '-';
-  btn.style.left = ( !btn.classList.contains( 'active' ) ) ? "8px" : "25%";
+  btn.innerText = btn.classList.contains( 'active' ) ? '-' : '+';
+  btn.style.left = btn.classList.contains( 'active' ) ? "25%" : "8px" ;
 }
 
 async function mapFileChange( e ) {
   const files = e.target.files;
-
   setProgress( 0 );
 
-  let file;
-  let map_found = false;
+  let file, map_found = false;
   for ( let f_idx = 0; f_idx < files.length; ++f_idx ) {
     const f = files[ f_idx ];
 
-    if ( f.size === 0 )
+    if ( !f.size )
       continue;
     
     if ( !f.name.endsWith( ".map" ) )
@@ -633,7 +604,6 @@ async function mapFileChange( e ) {
       throw new Error( `Please upload the WAD first ☺️\nCurrent WAD is ${ cur_wad }` );
   } catch ( err ) {
     hideProgress( );
-
     setErrorMessage( err.message );
     return;
   }
@@ -653,12 +623,11 @@ async function mapFileChange( e ) {
 async function wadFileChange( e ) {
   const files = e.target.files;
 
-  let file;
-  let wad_found = false;
+  let file, wad_found = false;
   for ( let f_idx = 0; f_idx < files.length; ++f_idx ) {
     const f = files[ f_idx ];
 
-    if ( f.size === 0 )
+    if ( !f.size )
       continue;
     
     if ( !f.name.endsWith( ".wad" ) )
@@ -678,6 +647,7 @@ async function wadFileChange( e ) {
   wad_data = await file.arrayBuffer( );
 }
 
+// TODO : make async
 function selectChangeMap( e ) {
   const selection = e.target.value;
 
@@ -701,17 +671,13 @@ function toggleWireframe( e ) {
 }
 
 function clickWireframe( ) {
-  if ( !dom_wireframe )
-    return;
-
-  dom_wireframe.click( );
+  if ( dom_wireframe )
+    dom_wireframe.click( );
 }
 
 function setWireframeOff( ) {
-  if ( !dom_wireframe )
-    return;
-
-  dom_wireframe.checked = false;
+  if ( dom_wireframe )
+    dom_wireframe.checked = false;
 }
 //#endregion
 
@@ -735,20 +701,13 @@ document.addEventListener( "DOMContentLoaded", async ( ) => {
 });
 
 onkeyup = ( e ) => {
-  if ( e.key !== 'x' )
-    return;
-
-  clickWireframe( );
+  if ( e.key === 'x' )
+    clickWireframe( );
 };
 
 onkeydown = ( e ) => {
-  if ( !dom_map_picker )
-    return;
-
-  if ( e.target !== dom_map_picker )
-    return;
-
-  e.preventDefault( );
+  if ( dom_map_picker && e.target === dom_map_picker )
+    e.preventDefault( );
 };
 
 onresize = ( ) => {
