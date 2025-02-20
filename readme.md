@@ -3,8 +3,7 @@
    - all seem to be inverted horizontally, and some seem to be offset improperly, but trenchbroom has no issue rendering so i don't know where the problem lies
    - [here](https://github.com/TrenchBroom/TrenchBroom/blob/master/common/src/mdl/UVCoordSystem.h) || [here](https://github.com/TrenchBroom/TrenchBroom/blob/master/common/src/mdl/MapFormat.cpp)
 
- - remove Promise.* and use async ?
-   - just go through all comments
+ - ^^ texture problem may be result of not parsing brush properties/headers, not 100% sure though
 
  - make better movement controller that incorporates delta time AND works w touch controls ( mayb onscreen ? idk )
    - unless its okay on mobile ( this should be tested alr )

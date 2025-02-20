@@ -22,7 +22,6 @@ const wad_regex = /^"wad"\s*"([^";]+?\.wad)(?=;|")/;
 const quake_palette = getQuakePalette( );
 
 const HALF_PI = Math.PI * 0.5;
-const FULLBRIGHT_IDX = 0xE0;
 const UPDATE_TIME = 1 / 20;
 const PROGRESS_STEPS = 10;
 const FLT_EPSILON = 1e-6;
@@ -143,6 +142,7 @@ function computeUVForVertex( vertex, line_data, texture ) {
   } else {
     getUVAxis( line_data.plane.normal );
     uv_offset = line_data.uv_offset;
+    u_vec3.negate( );
 
     const rotation = THREE.MathUtils.degToRad( line_data.rotation );
     const cos = Math.cos( rotation );
@@ -156,7 +156,7 @@ function computeUVForVertex( vertex, line_data, texture ) {
     vertex.dot( u_vec3 ) / line_data.uv_scale.x + uv_offset.x,
     vertex.dot( v_vec3 ) / line_data.uv_scale.y + uv_offset.y
   );
-
+  
   uv.set(
     uv.x / texture.image.width,
     uv.y / texture.image.height
@@ -236,18 +236,13 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   for ( let idx = 0; idx < data.length; ++idx ) {
     const palette_idx = data[ idx ];
 
-    // TODO : render special colors properly ( just fix quake palette i think ? idfk )
-    let alpha = 255;
-    if ( !is_valve_fmt && palette_idx >= FULLBRIGHT_IDX )
-      alpha = 0;
-
     const [ r, g, b ] = palette[ palette_idx ];
     const i = idx * 4;
 
     img_data.data[ i + 0 ] = r;
     img_data.data[ i + 1 ] = g;
     img_data.data[ i + 2 ] = b;
-    img_data.data[ i + 3 ] = alpha;
+    img_data.data[ i + 3 ] = 255;
   }
 
   ctx.putImageData( img_data, 0, 0 );
@@ -267,6 +262,7 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   texture.wrapT = THREE.RepeatWrapping;
   texture.needsUpdate = true;
   texture.flipY = false;
+  texture.name = name;
 
   return texture;
 }
@@ -454,14 +450,13 @@ function extractFirstWadName( ) {
   return null;
 }
 
-// TODO : make async
-function loadMap( ) {
+async function loadMap( ) {
   const valve_map = map_data.includes( "[" ) || map_data.includes( "]" );
   const wad = loadWad( );
 
   setProgress( 20 );
 
-  return Promise.resolve( parseMap( valve_map, wad ) );
+  return await parseMap( valve_map, wad );
 }
 
 async function loadDefaultMap( map ) {
@@ -487,7 +482,7 @@ async function loadDefaultMap( map ) {
 
     setProgress( 15 );
 
-    const loaded = loadMap( );
+    const loaded = await loadMap( );
     
     if ( loaded ) {
       setHudNames(
@@ -617,7 +612,7 @@ async function mapFileChange( e ) {
   scene.clear( );
   setMapName( file.name );
   clearTextures( );
-  loadMap( );
+  await loadMap( );
 }
 
 async function wadFileChange( e ) {
@@ -647,8 +642,7 @@ async function wadFileChange( e ) {
   wad_data = await file.arrayBuffer( );
 }
 
-// TODO : make async
-function selectChangeMap( e ) {
+async function selectChangeMap( e ) {
   const selection = e.target.value;
 
   if ( selection === "File Upload" || selection === prev_map_selection )
@@ -658,7 +652,7 @@ function selectChangeMap( e ) {
   clearTextures( );
   setWireframeOff( );
   prev_map_selection = e.target.value;
-  Promise.resolve( loadDefaultMap( e.target.value ) );
+  await loadDefaultMap( e.target.value );
 }
 
 function toggleWireframe( e ) {
