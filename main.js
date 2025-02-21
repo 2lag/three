@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import WebGL from 'three/addons/capabilities/WebGL.js';
-import { FlyControls } from 'three/addons/controls/FlyControls.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { getQuakePalette } from './js/static.js'
 import WadParser from './js/WadParser.js';
+import { CamCtl } from "./js/CamCtl.js";
 import {
   setProgress, getProgress, hideProgress,
   setErrorMessage,
@@ -511,14 +511,10 @@ async function init( ) {
 
   cam = new THREE.PerspectiveCamera( 69, w / h, 0.1, 2000 );
   
-  controls = new FlyControls( cam, renderer.domElement );
+  controls = new CamCtl( cam, renderer.domElement );
   
   cam.position.set( 0, 0, 0 );
   renderer.setSize( w, h );
-  
-  controls.dragToLook = ( w > h );
-  controls.movementSpeed = 100;
-  controls.rollSpeed = 0.5;
 
   return await loadDefaultMap( "files/valve/c1a0.map" );
 }
@@ -539,7 +535,7 @@ function toggleBottomCollapsibleSection( e ) {
   btn.classList.toggle( 'active' );
   
   if ( isSettingsActive( ) )
-    setTextureShowcaseHeight( "calc( 100% - 132px )" );
+    setTextureShowcaseHeight( "calc( 100% - 128px )" );
   else
     setTextureShowcaseHeight( "100%" );
 

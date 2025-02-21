@@ -1,15 +1,12 @@
 ### todo
+ - add togglable onscreen controls w/ joystick
+
+ - add hideable keybind list somewhere ( top / bottom right )
+
  - fix textures, still not 100% correct ( ONLY ON LIKE SOME QUAKE FACES )
    - all seem to be inverted horizontally, and some seem to be offset improperly, but trenchbroom has no issue rendering so i don't know where the problem lies
    - [here](https://github.com/TrenchBroom/TrenchBroom/blob/master/common/src/mdl/UVCoordSystem.h) || [here](https://github.com/TrenchBroom/TrenchBroom/blob/master/common/src/mdl/MapFormat.cpp)
-
  - ^^ texture problem may be result of not parsing brush properties/headers, not 100% sure though
-
- - make better movement controller that incorporates delta time AND works w touch controls ( mayb onscreen ? idk )
-   - unless its okay on mobile ( this should be tested alr )
-   - if it doesn't work well, copy [this](https://github.com/sbuggay/bspview/blob/master/src/CameraControls.ts) and add onscreen control/joystick as well as keybound ctls
-
- - add hideable keybind list somewhere ( top / bottom right )
 
  - make loading/parsing & running faster
    - profile site w ff dev ed
@@ -20,10 +17,13 @@
    - split up into files more, util file, etc
    - if possible make progress functionality cleaner w/o hardcode vals
 
- - make ui actually look like goldsrc w [this](https://github.com/x8BitRain/webhl) && [this](https://github.com/x8BitRain/webhl/blob/master/src/css/greensteam.css)
-
  - go thru any remaining comments
 
  - integrate to kuso.day/map.html
+   - update "work" cmd onsite w/ this + axonbox )))
 
  - get back to fpsic proj w/ [this project](https://github.com/2lag/three) & [this help](https://github.com/sbuggay/bspview/blob/master/spec/hlbsp.md) & also [this help](https://valvedev.info/guides/accelerating-map-compiles-in-quake-based-engines/) & [this](https://valvedev.info/guides/what-goes-into-compiling-a-source-map/)... basically anything [here](https://valvedev.info/guides/)
+
+
+SHOUT OUT : https://github.com/x8BitRain/webhl FOR GOLDSRC CSS
+SHOUT OUT : https://github.com/sbuggay/bspview/ FOR CAMERA CONTROLLER ( comes from Mr. James Baicoianu )
