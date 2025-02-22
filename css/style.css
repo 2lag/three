@@ -176,3 +176,66 @@ label:active {
   left: 50%;
   top: 50%;
 }
+
+/* ONSCREEN CONTROLS */
+.visible { display: flex !important; }
+
+#ctl_container {
+  justify-content: space-between;
+  background-color: transparent;
+  align-items: flex-end;
+  flex-direction: row;
+  position: absolute;
+  display: flex;
+  display: none;
+  height: 128px;
+  width: 100%;
+  bottom: 0;
+  left: 0;
+}
+
+#btn_container {
+  justify-content: center;
+  align-items: flex-end;
+  flex-direction: row;
+  width: fit-content;
+  display: flex;
+  margin: 10px;
+}
+
+#btn_container > div {
+  flex-direction: column;
+  display: flex;
+}
+
+#joystick_container {
+  background-color: transparent;
+  max-height: 128px;
+  min-height: 64px;
+  max-width: 128px;
+  min-width: 64px;
+  aspect-ratio: 1;
+  height: 100%;
+}
+
+#joystick_outer {
+  background-color: var( --goldsrc-light );
+  border: 5px solid var( --goldsrc );
+  height: calc( 100% - 20px );
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  max-height: 128px;
+  min-height: 64px;
+  max-width: 128px;
+  min-width: 64px;
+  aspect-ratio: 1;
+  display: flex;
+}
+
+#joystick {
+  background-color: var( --goldsrc-dark );
+  border-radius: 50%;
+  height: 50%;
+  width: 50%;
+}

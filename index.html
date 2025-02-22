@@ -19,6 +19,31 @@
     
     <div id="error"></div>
 
+    <div id="ctl_container">
+      <div id="btn_container">
+        <button id="left_btn" style="height: 64px; width: 64px;">
+          <img draggable="false" src="assets/images/scroll_left.png" style="height: 32px; width: 32px;" />
+        </button>
+        <div>
+          <button id="fwd_btn" style="height: 64px; width: 64px;">
+            <img draggable="false" src="assets/images/scroll_up.png" style="height: 32px; width: 32px;" />
+          </button>
+          <button id="back_btn" style="height: 64px; width: 64px;">
+            <img draggable="false" src="assets/images/scroll_down.png" style="height: 32px; width: 32px;" />
+          </button>
+        </div>
+        <button id="right_btn" style="height: 64px; width: 64px;">
+          <img draggable="false" src="assets/images/scroll_right.png" style="height: 32px; width: 32px;" />
+        </button>
+      </div>
+
+      <div id="joystick_container">
+        <div id="joystick_outer">
+          <div id="joystick"></div>
+        </div>
+      </div>
+    </div>
+
     <div id="side_collapsible_section"></div>
     <button type="button" id="side_collapsible_btn">+</button>
 
@@ -39,6 +64,10 @@
         </select>
         <span id="map_name"> </span>
       </div>
+
+      <div id="fps">
+        <span id="tagline">made by <a href="https://kuso.day" target="_blank">day</a></span>
+      </div>
       
       <div>
         <input type="file" id="wad" accept=".wad" name="wadfilename" hidden>
@@ -46,8 +75,9 @@
         <span id="wad_name"> </span>
       </div>
 
-      <div id="fps">
-        <span id="tagline">made by <a href="https://kuso.day" target="_blank">day</a></span>
+      <div>
+        <input type="checkbox" id="mobile">
+        On Screen Controls
       </div>
     </div>
   </body>
