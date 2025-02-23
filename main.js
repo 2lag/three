@@ -23,7 +23,7 @@ const quake_palette = getQuakePalette( );
 
 const HALF_PI = Math.PI * 0.5;
 const UPDATE_TIME = 1 / 20;
-const PROGRESS_STEPS = 10;
+const PROGRESS_STEPS = 27;
 const FLT_EPSILON = 1e-6;
 
 let dom_map_picker, dom_wireframe;
@@ -233,7 +233,6 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
 
   for ( let idx = 0; idx < data.length; ++idx ) {
     const palette_idx = data[ idx ];
-
     const [ r, g, b ] = palette[ palette_idx ];
     const i = idx * 4;
 
@@ -287,6 +286,11 @@ function setCamPos( x, y, z ) {
   cam.position.set( x, y, z );
 }
 
+async function updateProgress( progress ) {
+  setProgress( progress );
+  await new Promise( r => setTimeout( r, 0 ) );
+}
+
 async function parseMap( is_valve_fmt, wad ) {
   const unique_textures = new Set( );
   const texture_list = new Map( );
@@ -295,23 +299,19 @@ async function parseMap( is_valve_fmt, wad ) {
 
   const blocks = map_data.split( "}" ).join( "" )
                     .split( "{" )
-                    .map( b => b.trim( ) ).filter( b => b );
-                    
+                    .map( b => b.trim( ) ).filter( b => b )
+                    .filter( b => b.includes( '(' ) || b.includes( 'info_player_' ) );
+
   let updates = 0;
   let progress_track = getProgress( );
   const delta_progress = 95 - progress_track;
   const update_interval = Math.ceil( blocks.length / PROGRESS_STEPS );
   const block_delta = delta_progress / update_interval;
 
-  const updateProgress = async ( ) => {
-    progress_track += block_delta;
-    setProgress( progress_track );
-    await new Promise( r => setTimeout( r, 0 ) );
-  }
-
   for ( let b_idx = 0; b_idx < blocks.length; ++b_idx ) {
     if ( !( b_idx % update_interval ) && updates < PROGRESS_STEPS ) {
-      await updateProgress( );
+      progress_track += block_delta;
+      await updateProgress( progress_track );
       ++updates;
     }
 
@@ -323,7 +323,7 @@ async function parseMap( is_valve_fmt, wad ) {
       const line = lines[ l_idx ];
 
       if ( !spawn_found && line.startsWith( '"origin"' ) ) {
-        if ( !block.includes( "info_player_deathmatch" ) && !block.includes( "info_player_start" ) )
+        if ( !block.includes( "info_player_" ) )
           continue;
 
         const match = line.match( origin_regex );
@@ -343,16 +343,15 @@ async function parseMap( is_valve_fmt, wad ) {
       if ( !line.startsWith( "(" ) )
         continue;
 
-      let line_data = ( is_valve_fmt )
+      let data = ( is_valve_fmt )
         ? parseValveMapLine( line )
         : parseQuakeMapLine( line );
 
-      if ( !line_data )
+      if ( !data )
         continue;
 
-      /* account for default winding */
-      line_data.plane = new THREE.Plane( ).setFromCoplanarPoints( line_data.v0, line_data.v2, line_data.v1 );
-      face_data.push( line_data );
+      data.plane = new THREE.Plane( ).setFromCoplanarPoints( data.v0, data.v2, data.v1 );
+      face_data.push( data );
     }
 
     if ( block[ 0 ] !== '(' )
@@ -370,7 +369,6 @@ async function parseMap( is_valve_fmt, wad ) {
     }
 
     const geometries = new Map( );
-    const brushes = new THREE.Group( );
     for ( let f_idx = 0; f_idx < face_data.length; ++f_idx ) {
       const fd = face_data[ f_idx ];
 
@@ -383,7 +381,7 @@ async function parseMap( is_valve_fmt, wad ) {
 
       if ( !texture_list.has( fd.texture ) ) {
         if ( !unique_textures.has( fd.texture ) ) {
-          const matching_texture = wad.extractTextureFromName( fd.texture, is_valve_fmt );
+          const matching_texture = wad.getTextureFromName( fd.texture, is_valve_fmt );
           if ( !matching_texture ) {
             console.error( `failed to find texture '${ fd.texture }' in wad dir` );
             continue;
@@ -404,6 +402,7 @@ async function parseMap( is_valve_fmt, wad ) {
       geometries.get( fd.texture ).push( face_geometry );
     }
     
+    const brushes = new THREE.Group( );
     const keys = Array.from( geometries.keys( ) );
     for ( let g_idx = 0; g_idx < keys.length; ++g_idx ) {
       const tex_name = keys[ g_idx ];
@@ -423,8 +422,8 @@ async function parseMap( is_valve_fmt, wad ) {
   }
   
   sortTexturesById( );
-  scene.add( map );
   setProgress( 100 );
+  scene.add( map );
   return true;
 }
 
@@ -562,13 +561,11 @@ async function mapFileChange( e ) {
     break;
   }
 
-  setProgress( 1 );
-
   try {
     if ( !map_found )
       throw new Error( "No map found" );
-    
-    setProgress( 2 );
+
+    setProgress( 1 );
 
     map_data = await file.text( );
     const wad_name = extractFirstWadName( );
@@ -578,11 +575,11 @@ async function mapFileChange( e ) {
     if ( !wad_name || !wad_name.endsWith( '.wad' ) )
       throw new Error( `WAD name not found in ${ file.name }` );
   
-    const cur_wad = getWadName( );
     wad_name = wad_name.split( "/" ).slice( -1 )[ 0 ];
-  
+    const cur_wad = getWadName( );
+    
     if ( cur_wad !== wad_name )
-      throw new Error( `Please upload the WAD first ☺️\nCurrent WAD is ${ cur_wad }` );
+      throw new Error( `Please upload the WAD first ☺️ !\nCurrent WAD is ${ cur_wad }, not ${ wad_name }.` );
   } catch ( err ) {
     hideProgress( );
     setErrorMessage( err.message );
@@ -592,12 +589,12 @@ async function mapFileChange( e ) {
   prev_map_selection = dom_map_picker.options[ dom_map_picker.selectedIndex ].text;
   dom_map_picker.selectedIndex = dom_map_picker.length - 1;
   
-  setProgress( 10 );
-  
+  setProgress( 8 );
   scene.clear( );
   clearTextures( );
   setWireframeOff( );
   setMapName( file.name );
+  setProgress( 13 );
   
   await loadMap( );
 }

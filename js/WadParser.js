@@ -82,7 +82,7 @@ class WadParser {
     return { name, width, height, data, palette };
   }
 
-  extractTextureFromName( name, is_valve_fmt ) {
+  getTextureFromName( name, is_valve_fmt ) {
     let dir_entry = null;
     
     for ( let d_idx = 0; d_idx < this.directory.length; ++d_idx ) {

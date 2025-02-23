@@ -1,9 +1,7 @@
 ### todo
- - clean main.js
-   - no functions longer than 60 lines, no wider than 80-90 chars ( just parseMap & mapFileChange )
-   - make sure all throws are handled w/ on-screen error messages when caught
-   - make sure all null / early rets are handled
-   - split up into files more, util file, etc
+ - clean main.js ( just parseMap & mapFileChange )
+   - no functions longer than 60 lines, no wider than 80-90 chars
+   - split up into files more, util file, etc if needed
 
  - make progress functionality cleaner w/o hardcode vals
  
