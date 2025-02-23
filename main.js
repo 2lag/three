@@ -40,12 +40,10 @@ const v0 = new THREE.Vector3( );
 const v1 = new THREE.Vector3( );
 const v2 = new THREE.Vector3( );
 const uv = new THREE.Vector3( );
-let controls;
-let renderer;
-let cam;
+let controls, renderer, cam;
 
 function loadWad( ) {
-  let parser = new WadParser( wad_data );
+  const parser = new WadParser( wad_data );
 
   try { parser.parseHeader( ); }
   catch( err ) { setErrorMessage( err.message ); }
@@ -105,7 +103,7 @@ function computeIntersection( p0, p1, p2 ) {
   ci_term1.crossVectors( n2, n0 ).multiplyScalar( -p1.constant );
   ci_term2.crossVectors( n0, n1 ).multiplyScalar( -p2.constant );
 
-  return new THREE.Vector3( ).addVectors( ci_term0 , ci_term1 ).add( ci_term2 ).divideScalar( denominator );
+  return new THREE.Vector3( ).add( ci_term0 ).add( ci_term1 ).add( ci_term2 ).divideScalar( denominator );
 }
 
 function isPointInsideBrush( point, planes ) {
@@ -122,7 +120,7 @@ function isPointInsideBrush( point, planes ) {
 const TAN_001 = new THREE.Vector3( 0, 0, 1 );
 const TAN_010 = new THREE.Vector3( 0, 1, 0 );
 function getUVAxis( normal ) {
-  let tangent = ( Math.abs( normal.dot( TAN_001 ) ) > 0.99 ) ? TAN_010 : TAN_001;
+  const tangent = Math.abs( normal.dot( TAN_001 ) ) > 0.99 ? TAN_010 : TAN_001;
   u_vec3.crossVectors( normal, tangent ).normalize( );
   v_vec3.crossVectors( normal, u_vec3  ).normalize( );
 }
@@ -256,10 +254,8 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   appendTexture( cdiv );
 
   const texture = new THREE.Texture( canvas );
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
+  texture.minFilter = texture.magFilter = THREE.NearestFilter;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.needsUpdate = true;
   texture.flipY = false;
   texture.name = name;
@@ -283,7 +279,6 @@ function computeBrushVertices( planes ) {
       }
     }
   }
-
   return verts;
 }
 
@@ -294,8 +289,8 @@ function setCamPos( x, y, z ) {
 
 async function parseMap( is_valve_fmt, wad ) {
   const unique_textures = new Set( );
-  const map = new THREE.Group( );
   const texture_list = new Map( );
+  const map = new THREE.Group( );
   let spawn_found = false;
 
   const blocks = map_data.split( "}" ).join( "" )
@@ -558,15 +553,10 @@ async function mapFileChange( e ) {
   setProgress( 0 );
 
   let file, map_found = false;
-  for ( let f_idx = 0; f_idx < files.length; ++f_idx ) {
-    const f = files[ f_idx ];
-
-    if ( !f.size )
-      continue;
-    
-    if ( !f.name.endsWith( ".map" ) )
-      continue;
-
+  for ( let idx = 0; idx < files.length; ++idx ) {
+    const f = files[ idx ];
+    if ( !f.size ) continue;
+    if ( !f.name.endsWith( ".map" ) ) continue;
     map_found = true;
     file = f;
     break;
@@ -581,7 +571,7 @@ async function mapFileChange( e ) {
     setProgress( 2 );
 
     map_data = await file.text( );
-    let wad_name = extractFirstWadName( );
+    const wad_name = extractFirstWadName( );
 
     setProgress( 5 );
   
@@ -602,12 +592,13 @@ async function mapFileChange( e ) {
   prev_map_selection = dom_map_picker.options[ dom_map_picker.selectedIndex ].text;
   dom_map_picker.selectedIndex = dom_map_picker.length - 1;
   
-  setWireframeOff( );
   setProgress( 10 );
-
+  
   scene.clear( );
-  setMapName( file.name );
   clearTextures( );
+  setWireframeOff( );
+  setMapName( file.name );
+  
   await loadMap( );
 }
 

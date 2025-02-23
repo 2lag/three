@@ -2,7 +2,7 @@
  * @author James Baicoianu / http://www.baicoianu.com/
  */
 
-// translated to JS & expanded by day ))
+// translated to JS & expanded by day | https://kuso.day/ ))
 
 import * as THREE from "three";
 
@@ -15,60 +15,59 @@ let control_checkbox,
     left_btn, right_btn,
     joystick, joystick_bound;
 
+const x_axis = new THREE.Vector3( 1, 0, 0 );
+const y_axis = new THREE.Vector3( 0, 0, 1 );
 let joystick_interval = null;
 let last_event = null;
 
 export class CamCtl {
   constructor( camera, domElement ) {
-    this.camera = camera;
     this.domElement = domElement;
-    this.movementSpeed = 100;
+    this.camera = camera;
+    
+    this.hotkeys = { };
     this.rollSpeed = 0.005;
+    this.movementSpeed = 50;
+    this.movementSpeedMultiplier = 1;
+    this.moveVector = new THREE.Vector3( );
+    this.rotationVector = new THREE.Vector3( );
     this.tmpQuaternion = new THREE.Quaternion( );
 
     this.moveState = {
-      up: 0, down: 0, left: 0, right: 0, fwd: 0, back: 0,
-      pitchUp: 0, pitchDown: 0, yawLeft: 0, yawRight: 0, rollLeft: 0, rollRight: 0
-    }
+      up: 0, down: 0,
+      left: 0, right: 0,
+      fwd: 0, back: 0
+    };
     
-    this.movementSpeedMultiplier = 1;
-    this.moveVector = new THREE.Vector3( 0, 0, 0 );
-    this.rotationVector = new THREE.Vector3( 0, 0, 0 );
-
     this._mousemove = this.bind( this, this.mousemove );
     this._mousedown = this.bind( this, this.mousedown );
     this._keydown = this.bind( this, this.keydown );
     this._keyup = this.bind( this, this.keyup );
-
-    this.hotkeys = { };
 
     this.domElement.addEventListener( "contextmenu", this.contextmenu, false );
     this.domElement.addEventListener( "mousemove", this._mousemove, false );
     this.domElement.addEventListener( "mousedown", this._mousedown, false );
     this.domElement.addEventListener( "mouseup", this._mouseup, false );
     
-    document.addEventListener( "pointerlockchange", lockChangeAlert.bind( this ), false );
-    document.addEventListener( "mozpointerlockerror", lockChangeAlert.bind( this ), false );
-    
-    function lockChangeAlert( ) {
-      this.controlsFocused = ( document.pointerLockElement === this.domElement );
+    function ptrLock( ) {
+      this.controlsFocused = document.pointerLockElement === this.domElement;
     }
+    
+    document.addEventListener( "pointerlockchange", ptrLock.bind( this ), false );
+    document.addEventListener( "mozpointerlockerror", ptrLock.bind( this ), false );
 
     window.addEventListener( "keydown", this._keydown, false );
     window.addEventListener( "keyup", this._keyup, false );
 
     this.updateMovementVector( );
-
     this.controlsFocused = false;
 
-    window.addEventListener( "virtualmousemove", this._virtualMousemove.bind( this ), false );
+    window.addEventListener( "vmm", this._virtualMousemove.bind( this ), false );
   }
 
   _virtualMousemove( event ) {
     const { movementX, movementY } = event.detail;
-    const x_axis = new THREE.Vector3( 1, 0, 0 );
-    const y_axis = new THREE.Vector3( 0, 0, 1 );
-
+    
     this.camera.rotateOnAxis( x_axis, movementY );
     this.camera.rotateOnWorldAxis( y_axis, movementX );
   }
@@ -120,9 +119,6 @@ export class CamCtl {
     if ( !this.controlsFocused )
       return;
 
-    let x_axis = new THREE.Vector3( 1, 0, 0 );
-    let y_axis = new THREE.Vector3( 0, 0, 1 );
-
     this.camera.rotateOnAxis( x_axis, event.movementY * -0.002 );
     this.camera.rotateOnWorldAxis( y_axis, event.movementX * -0.002 );
   }
@@ -135,7 +131,7 @@ export class CamCtl {
 
     this.domElement.requestPointerLock( );
     this.domElement.requestFullscreen( ).catch( ( err ) => {
-      alert( `Error attempting to enable fullscreen: ${ err.message } ( ${ err.name } )`)
+      alert( `Error enabling fullscreen: ${ err.message } ( ${ err.name } )`)
     });
   }
 
@@ -168,9 +164,11 @@ export class CamCtl {
   updateMovementVector( ) {
     let fwd = this.moveState.fwd || ( false && !this.moveState.back ) ? 1 : 0;
 
-    this.moveVector.x = -this.moveState.left + this.moveState.right;
-    this.moveVector.y = -this.moveState.down + this.moveState.up;
-    this.moveVector.z = -fwd + this.moveState.back;
+    this.moveVector.set(
+      -this.moveState.left + this.moveState.right,
+      -this.moveState.down + this.moveState.up,
+      -fwd + this.moveState.back
+    );
   }
 
   bind( scope, fn ) {
@@ -261,14 +259,11 @@ function simulateMouse( e ) {
 
   joystick.style.transform = `translate( ${ dx }px, ${ dy }px )`;
 
-  const look_x = dx / max_r * -JOYSTICK_SENS;
-  const look_y = dy / max_r * -JOYSTICK_SENS;
+  const movementX = dx / max_r * -JOYSTICK_SENS;
+  const movementY = dy / max_r * -JOYSTICK_SENS;
 
-  const ce = new CustomEvent( 'virtualmousemove', {
-    detail: {
-      movementY: look_y,
-      movementX: look_x
-    },
+  const ce = new CustomEvent( 'vmm', {
+    detail: { movementY, movementX },
     bubbles: true
   });
 
@@ -281,13 +276,11 @@ function simulateKeyEvent( type, key, keyCode ) {
 }
 
 document.addEventListener( "DOMContentLoaded", ( ) => {
+  joystick_bound = document.getElementById( 'joystick_outer' );
   ctl_container = document.getElementById( 'ctl_container' );
   control_checkbox = document.getElementById( 'mobile' );
-
-  joystick_bound = document.getElementById( 'joystick_outer' );
-  joystick = document.getElementById( 'joystick' );
-
   right_btn = document.getElementById( 'right_btn' );
+  joystick = document.getElementById( 'joystick' );
   left_btn = document.getElementById( 'left_btn' );
   back_btn = document.getElementById( 'back_btn' );
   fwd_btn = document.getElementById( 'fwd_btn' );
@@ -295,20 +288,19 @@ document.addEventListener( "DOMContentLoaded", ( ) => {
   control_checkbox.onclick = toggleOnScreenControls;
 
   right_btn.addEventListener( "mousedown", ( ) => simulateKeyEvent( "keydown", "d", 68 ) );
-  right_btn.addEventListener( "mouseup", ( ) => simulateKeyEvent( "keyup", "d", 68 ) );
-  right_btn.addEventListener( "mouseleave", ( ) => simulateKeyEvent( "keyup", "d", 68 ) );
-
   left_btn.addEventListener( "mousedown", ( ) => simulateKeyEvent( "keydown", "a", 65 ) );
-  left_btn.addEventListener( "mouseup", ( ) => simulateKeyEvent( "keyup", "a", 65 ) );
-  left_btn.addEventListener( "mouseleave", ( ) => simulateKeyEvent( "keyup", "a", 65 ) );
-
   back_btn.addEventListener( "mousedown", ( ) => simulateKeyEvent( "keydown", "s", 83 ) );
-  back_btn.addEventListener( "mouseup", ( ) => simulateKeyEvent( "keyup", "s", 83 ) );
-  back_btn.addEventListener( "mouseleave", ( ) => simulateKeyEvent( "keyup", "s", 83 ) );
-
   fwd_btn.addEventListener( "mousedown", ( ) => simulateKeyEvent( "keydown", "w", 87 ) );
-  fwd_btn.addEventListener( "mouseup", ( ) => simulateKeyEvent( "keyup", "w", 87 ) );
+
+  right_btn.addEventListener( "mouseleave", ( ) => simulateKeyEvent( "keyup", "d", 68 ) );
+  left_btn.addEventListener( "mouseleave", ( ) => simulateKeyEvent( "keyup", "a", 65 ) );
+  back_btn.addEventListener( "mouseleave", ( ) => simulateKeyEvent( "keyup", "s", 83 ) );
   fwd_btn.addEventListener( "mouseleave", ( ) => simulateKeyEvent( "keyup", "w", 87 ) );
+  
+  right_btn.addEventListener( "mouseup", ( ) => simulateKeyEvent( "keyup", "d", 68 ) );
+  left_btn.addEventListener( "mouseup", ( ) => simulateKeyEvent( "keyup", "a", 65 ) );
+  back_btn.addEventListener( "mouseup", ( ) => simulateKeyEvent( "keyup", "s", 83 ) );
+  fwd_btn.addEventListener( "mouseup", ( ) => simulateKeyEvent( "keyup", "w", 87 ) );
 
   joystick_bound.addEventListener( 'touchstart', handleStart, false );
   joystick_bound.addEventListener( 'touchmove', handleMove, false );

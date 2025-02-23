@@ -15,34 +15,19 @@
     </script>
   </head>
   <body>
+    <div id="keybinds">
+      wasd | move<br>
+      space | up<br>
+      ctrl | down<br>
+      mouse | look<br>
+      f | fullscreen
+      <hr>
+      or on-screen controls
+    </div>
+
     <progress max="100" value="0" id="progress"></progress>
     
     <div id="error"></div>
-
-    <div id="ctl_container">
-      <div id="btn_container">
-        <button id="left_btn" style="height: 64px; width: 64px;">
-          <img draggable="false" src="assets/images/scroll_left.png" style="height: 32px; width: 32px;" />
-        </button>
-        <div>
-          <button id="fwd_btn" style="height: 64px; width: 64px;">
-            <img draggable="false" src="assets/images/scroll_up.png" style="height: 32px; width: 32px;" />
-          </button>
-          <button id="back_btn" style="height: 64px; width: 64px;">
-            <img draggable="false" src="assets/images/scroll_down.png" style="height: 32px; width: 32px;" />
-          </button>
-        </div>
-        <button id="right_btn" style="height: 64px; width: 64px;">
-          <img draggable="false" src="assets/images/scroll_right.png" style="height: 32px; width: 32px;" />
-        </button>
-      </div>
-
-      <div id="joystick_container">
-        <div id="joystick_outer">
-          <div id="joystick"></div>
-        </div>
-      </div>
-    </div>
 
     <div id="side_collapsible_section"></div>
     <button type="button" id="side_collapsible_btn">+</button>
@@ -78,6 +63,31 @@
       <div>
         <input type="checkbox" id="mobile">
         On Screen Controls
+      </div>
+    </div>
+
+    <div id="ctl_container">
+      <div id="btn_container">
+        <button id="left_btn" style="height: 48px; width: 48px;">
+          <img draggable="false" src="assets/images/scroll_left.png" style="height: 32px; width: 32px;" />
+        </button>
+        <div>
+          <button id="fwd_btn" style="height: 48px; width: 48px;">
+            <img draggable="false" src="assets/images/scroll_up.png" style="height: 32px; width: 32px;" />
+          </button>
+          <button id="back_btn" style="height: 48px; width: 48px;">
+            <img draggable="false" src="assets/images/scroll_down.png" style="height: 32px; width: 32px;" />
+          </button>
+        </div>
+        <button id="right_btn" style="height: 48px; width: 48px;">
+          <img draggable="false" src="assets/images/scroll_right.png" style="height: 32px; width: 32px;" />
+        </button>
+      </div>
+
+      <div id="joystick_container">
+        <div id="joystick_outer">
+          <div id="joystick"></div>
+        </div>
       </div>
     </div>
   </body>

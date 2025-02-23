@@ -68,6 +68,7 @@ label:active {
   aspect-ratio: 1;
   position: fixed;
   width: 32px;
+  z-index: 2;
   left: 8px;
   right: 0;
 }
@@ -77,8 +78,9 @@ label:active {
   left: calc( 50% - 16px );
   aspect-ratio: 1;
   position: fixed;
-  width: 32px;
   bottom: 8px;
+  width: 32px;
+  z-index: 2;
 }
 
 #side_collapsible_section {
@@ -97,6 +99,7 @@ label:active {
   display: flex;
   height: 100%;
   left: -100%;
+  z-index: 2;
   top: 0;
 }
 
@@ -118,6 +121,7 @@ label:active {
   display: flex;
   height: 128px;
   width: 100%;
+  z-index: 2;
   left: 0;
 }
 
@@ -147,6 +151,16 @@ label:active {
   max-width: 45%;
   height: auto;
   margin: 5px;
+}
+
+#keybinds {
+  pointer-events: none;
+  text-align: center;
+  position: absolute;
+  width: fit-content;
+  margin: 5px;
+  right: 0;
+  top: 0;
 }
 
 #fps > div { position: relative !important; }
@@ -190,6 +204,7 @@ label:active {
   display: none;
   height: 128px;
   width: 100%;
+  z-index: 1;
   bottom: 0;
   left: 0;
 }
