@@ -25,6 +25,11 @@ function getProgress( ) {
   return dom_progress.value;
 }
 
+async function updateProgress( val ) {
+  setProgress( val );
+  await new Promise( r => setTimeout( r, 0 ) );
+}
+
 function hideProgress( ) {
   if ( !dom_progress )
     return;
@@ -157,6 +162,7 @@ document.addEventListener( "DOMContentLoaded", ( ) => {
 export {
   setProgress,
   getProgress,
+  updateProgress,
   hideProgress,
   setErrorMessage,
   sortTexturesById,

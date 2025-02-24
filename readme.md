@@ -1,10 +1,4 @@
 ### todo
- - clean main.js ( just parseMap )
-   - no functions longer than 60 lines, no wider than 80-90 chars
-   - split up into files more, util file, etc if needed
-
- - look through again make sure funcs are less than 60 lines
-
  - fix view bounds ( limit up/down & normalize movement so that holding space while looking straight down still moves up, not forward )
 
  - multiply movement and looking by delta time to properly have a consistent move / look speed

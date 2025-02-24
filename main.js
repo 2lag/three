@@ -5,7 +5,7 @@ import { getQuakePalette } from './js/static.js'
 import WadParser from './js/WadParser.js';
 import { CamCtl } from "./js/CamCtl.js";
 import {
-  setProgress, getProgress, hideProgress,
+  setProgress, getProgress, updateProgress, hideProgress,
   setErrorMessage,
   sortTexturesById,
   setHudNames, getWadName, setWadName, setMapName,
@@ -287,14 +287,16 @@ function computeBrushVertices( planes ) {
   return verts;
 }
 
-function setCamPos( x, y, z ) {
-  cam.rotation.set( 0, HALF_PI, HALF_PI );
-  cam.position.set( x, y, z );
+function splitMapBrushBlocks( ) {
+  return map_data.split( "}" ).join( "" )
+                 .split( "{" )
+                 .map( b => b.trim( ) )
+                 .filter( b => b )
+                 .filter( b => b.includes( '(' ) || b.includes( 'info_player_' ) );
 }
 
-async function updateProgress( progress ) {
-  setProgress( progress );
-  await new Promise( r => setTimeout( r, 0 ) );
+function splitMapLines( block ) {
+  return block.split( "\n" ).map( l => l.trim( ) ).filter( l => l );
 }
 
 function getSpawn( block, line ) {
@@ -304,8 +306,9 @@ function getSpawn( block, line ) {
   const match = line.match( origin_regex );
 
   if ( !match ) return false;
-
-  setCamPos(
+  
+  cam.rotation.set( 0, HALF_PI, HALF_PI );
+  cam.position.set(
     parseFloat( match[ 1 ] ),
     parseFloat( match[ 2 ] ),
     parseFloat( match[ 3 ] )
@@ -331,6 +334,76 @@ function updateTextureList( fd, textures, unique_textures, wad, is_valve_fmt ) {
   return true;
 }
 
+function processFaces( face_data, vertices, wad, is_valve_fmt, textures, unique_textures, geometries ) {
+  for ( let f_idx = 0; f_idx < face_data.length; ++f_idx ) {
+    const fd = face_data[ f_idx ];
+
+    const face_verts = getFacePolygon( fd, vertices );
+
+    if ( !face_verts || face_verts.length < 3 ) {
+      console.error( "failed to compute face polygon for face:", fd );
+      continue;
+    }
+
+    const updated = updateTextureList( fd, textures, unique_textures, wad, is_valve_fmt );
+    if ( !updated )
+      continue;
+
+    const texture = textures.get( fd.texture );
+    const face_geometry = createFaceGeometry( face_verts, fd, texture );
+    
+    if ( !geometries.has( fd.texture ) )
+      geometries.set( fd.texture, [ ] );
+      
+    geometries.get( fd.texture ).push( face_geometry );
+  }
+}
+
+function processBlock( block, wad, is_valve_fmt, textures, unique_textures, geometries, spawn_found ) {
+  const lines = splitMapLines( block );
+  let new_spawn_found = false;
+  const face_data = [ ];
+
+  for ( let l_idx = 0; l_idx < lines.length; ++l_idx ) {
+    const line = lines[ l_idx ];
+
+    if ( !spawn_found && line.startsWith( '"origin"' ) ) {
+      new_spawn_found = getSpawn( block, line );
+      break;
+    }
+
+    if ( !line.startsWith( "(" ) )
+      continue;
+
+    const data = ( is_valve_fmt )
+      ? parseValveMapLine( line )
+      : parseQuakeMapLine( line );
+
+    if ( !data )
+      continue;
+
+    data.plane = new THREE.Plane( ).setFromCoplanarPoints( data.v0, data.v2, data.v1 );
+    face_data.push( data );
+  }
+
+  if ( block[ 0 ] !== '(' )
+    return new_spawn_found;
+
+  if ( face_data.length < 4 ) {
+    console.error( `too few planes ( ${ face_data.length } ) for brush:`, block );
+    return new_spawn_found;
+  }
+
+  const vertices = computeBrushVertices( face_data.map( fd => fd.plane ) );
+  if ( !vertices.length ) {
+    console.error( "no vertices computed for brush" );
+    return new_spawn_found;
+  }
+
+  processFaces( face_data, vertices, wad, is_valve_fmt, textures, unique_textures, geometries );
+  return new_spawn_found;
+}
+
 function getMergedBrushes( textures, geometries ) {
   const brushes = new THREE.Group( );
   const keys = Array.from( geometries.keys( ) );
@@ -352,23 +425,18 @@ function getMergedBrushes( textures, geometries ) {
 }
 
 async function parseMap( wad, is_valve_fmt ) {
+  const blocks = splitMapBrushBlocks( );
   const unique_textures = new Set( );
+  const geometries = new Map( );
   const textures = new Map( );
-  const map = new THREE.Group( );
   let spawn_found = false;
-
-  const blocks = map_data.split( "}" ).join( "" )
-                         .split( "{" )
-                         .map( b => b.trim( ) )
-                         .filter( b => b )
-                         .filter( b => b.includes( '(' ) || b.includes( 'info_player_' ) );
-
+  
   let updates = 0;
   let progress_track = getProgress( );
   const delta_progress = 95 - progress_track;
   const update_interval = Math.ceil( blocks.length / PROGRESS_STEPS );
   const block_delta = delta_progress / update_interval;
-
+  
   for ( let b_idx = 0; b_idx < blocks.length; ++b_idx ) {
     if ( !( b_idx % update_interval ) && updates < PROGRESS_STEPS ) {
       progress_track += block_delta;
@@ -376,71 +444,19 @@ async function parseMap( wad, is_valve_fmt ) {
       ++updates;
     }
 
-    const face_data = [ ];
-    const block = blocks[ b_idx ];
-    const lines = block.split( "\n" ).map( l => l.trim( ) ).filter( l => l );
-
-    for ( let l_idx = 0; l_idx < lines.length; ++l_idx ) {
-      const line = lines[ l_idx ];
-
-      if ( !spawn_found && line.startsWith( '"origin"' ) )
-        spawn_found = getSpawn( block, line );
-
-      if ( !line.startsWith( "(" ) )
-        continue;
-
-      const data = ( is_valve_fmt )
-        ? parseValveMapLine( line )
-        : parseQuakeMapLine( line );
-
-      if ( !data )
-        continue;
-
-      data.plane = new THREE.Plane( ).setFromCoplanarPoints( data.v0, data.v2, data.v1 );
-      face_data.push( data );
-    }
-
-    if ( block[ 0 ] !== '(' )
-      continue;
-
-    if ( face_data.length < 4 ) {
-      console.error( `too few planes ( ${ face_data.length } ) for brush:`, block );
-      continue;
-    }
-
-    const vertices = computeBrushVertices( face_data.map( fd => fd.plane ) );
-    if ( !vertices.length ) {
-      console.error( "no vertices computed for brush" );
-      continue;
-    }
-
-    const geometries = new Map( );
-    for ( let f_idx = 0; f_idx < face_data.length; ++f_idx ) {
-      const fd = face_data[ f_idx ];
-
-      const face_verts = getFacePolygon( fd, vertices );
-
-      if ( !face_verts || face_verts.length < 3 ) {
-        console.error( "failed to compute face polygon for face:", fd );
-        continue;
-      }
-
-      const updated = updateTextureList( fd, textures, unique_textures, wad, is_valve_fmt );
-      if ( !updated ) continue;
-
-      const texture = textures.get( fd.texture );
-      const face_geometry = createFaceGeometry( face_verts, fd, texture );
-      
-      if ( !geometries.has( fd.texture ) )
-        geometries.set( fd.texture, [ ] );
-        
-      geometries.get( fd.texture ).push( face_geometry );
-    }
-    
-    map.add(
-      getMergedBrushes( textures, geometries )
+    const new_spawn_found = processBlock(
+      blocks[ b_idx ],
+      wad, is_valve_fmt,
+      textures, unique_textures,
+      geometries, spawn_found
     );
+
+    if ( new_spawn_found && !spawn_found )
+      spawn_found = true;
   }
+
+  const brushes = getMergedBrushes( textures, geometries );
+  const map = new THREE.Group( ).add( brushes );
   
   sortTexturesById( );
   setProgress( 100 );
