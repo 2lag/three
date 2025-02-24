@@ -150,20 +150,20 @@ input[type='checkbox']:focus {
   outline-offset: -2px;
 }
 input[type='checkbox']:checked {
-  background-image: url('../assets/images/checkmark.png');
+  background-image: url('../images/checkmark.png');
 }
 input[type='radio'] {
   vertical-align: text-bottom;
   appearance: none;
   width: 15px;
   height: 15px;
-  background-image: url('../assets/images/radio_off.png');
+  background-image: url('../images/radio_off.png');
 }
 input[type='radio']:focus {
   outline: 1px dotted black;
 }
 input[type='radio']:checked {
-  background-image: url('../assets/images/radio_on.png');
+  background-image: url('../images/radio_on.png');
 }
 input[type='text'],
 input[type='tel'],
@@ -308,7 +308,7 @@ input[type='range']:focus {
   outline-offset: 2px;
 }
 input[type='range'].ticks {
-  background: url('../assets/images/sliderticks.png') repeat-x;
+  background: url('../images/sliderticks.png') repeat-x;
   background-position: bottom left 2px;
   background-size: 19px 5px;
 }
@@ -335,9 +335,9 @@ input[type='range'].ticks::after {
   height: 18px;
   line-height: 18px;
   text-indent: 24px;
-  background-image: url('../assets/images/steamico.png'),
-    url('../assets/images/minimize.png'),
-    url('../assets/images/close.png');
+  background-image: url('../images/steamico.png'),
+    url('../images/minimize.png'),
+    url('../images/close.png');
   background-repeat: no-repeat;
   background-position: top left, top right 20px, top right;
 }
@@ -354,7 +354,7 @@ input[type='range'].ticks::after {
   right: -7px;
   cursor: nwse-resize;
   content: '';
-  background-image: url('../assets/images/resize.png');
+  background-image: url('../images/resize.png');
 }
 .window.half,
 .window-row .window {
@@ -433,19 +433,19 @@ progress::-moz-progress-bar {
   border-right: solid 1px #899281;
 }
 ::-webkit-scrollbar-button:vertical:increment {
-  background: url('../assets/images/scroll_down.png') no-repeat center,
+  background: url('../images/scroll_down.png') no-repeat center,
     #4c5844;
 }
 ::-webkit-scrollbar-button:vertical:decrement {
-  background: url('../assets/images/scroll_up.png') no-repeat center,
+  background: url('../images/scroll_up.png') no-repeat center,
     #4c5844;
 }
 ::-webkit-scrollbar-button:horizontal:increment {
-  background: url('../assets/images/scroll_right.png') no-repeat center,
+  background: url('../images/scroll_right.png') no-repeat center,
     #4c5844;
 }
 ::-webkit-scrollbar-button:horizontal:decrement {
-  background: url('../assets/images/scroll_left.png') no-repeat center,
+  background: url('../images/scroll_left.png') no-repeat center,
     #4c5844;
 }
 /*** Borders ***/

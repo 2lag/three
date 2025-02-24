@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
     <title>MapJS</title>
+    <meta charset="utf-8">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/goldsrc.css">
     <script type="importmap">
@@ -19,14 +19,13 @@
       wasd | move<br>
       space | up<br>
       ctrl | down<br>
+      shift | go fast<br>
       mouse | look<br>
-      f | fullscreen
-      <hr>
-      or on-screen controls
+      f | fullscreen<hr>
+      on-screen controls
     </div>
 
     <progress max="100" value="0" id="progress"></progress>
-    
     <div id="error"></div>
 
     <div id="side_collapsible_section"></div>
@@ -34,10 +33,7 @@
 
     <button type="button" id="bottom_collapsible_btn">+</button>
     <div id="bottom_collapsible_section">
-      <div>
-        <input type="checkbox" id="wireframe">
-        Wireframe 'X'
-      </div>
+      <div><input type="checkbox" id="wireframe">Wireframe 'X'</div>
       
       <div>
         <input type="file" id="map" accept=".map" name="mapfilename" hidden>
@@ -47,7 +43,7 @@
           <option value="files/quake/dm1.map">dm1 (Quake)</option>
           <option>File Upload</option>
         </select>
-        <span id="map_name"> </span>
+        <span id="map_name"></span>
       </div>
 
       <div id="fps">
@@ -57,30 +53,27 @@
       <div>
         <input type="file" id="wad" accept=".wad" name="wadfilename" hidden>
         <label for="wad">Choose WAD</label>
-        <span id="wad_name"> </span>
+        <span id="wad_name"></span>
       </div>
 
-      <div>
-        <input type="checkbox" id="mobile">
-        On Screen Controls
-      </div>
+      <div><input type="checkbox" id="mobile">On Screen Controls</div>
     </div>
 
     <div id="ctl_container">
       <div id="btn_container">
-        <button id="left_btn" style="height: 48px; width: 48px;">
-          <img draggable="false" src="assets/images/scroll_left.png" style="height: 32px; width: 32px;" />
+        <button id="left_btn">
+          <img draggable="false" src="images/scroll_left.png" />
         </button>
         <div>
-          <button id="fwd_btn" style="height: 48px; width: 48px;">
-            <img draggable="false" src="assets/images/scroll_up.png" style="height: 32px; width: 32px;" />
+          <button id="fwd_btn">
+            <img draggable="false" src="images/scroll_up.png" />
           </button>
-          <button id="back_btn" style="height: 48px; width: 48px;">
-            <img draggable="false" src="assets/images/scroll_down.png" style="height: 32px; width: 32px;" />
+          <button id="back_btn">
+            <img draggable="false" src="images/scroll_down.png" />
           </button>
         </div>
-        <button id="right_btn" style="height: 48px; width: 48px;">
-          <img draggable="false" src="assets/images/scroll_right.png" style="height: 32px; width: 32px;" />
+        <button id="right_btn">
+          <img draggable="false" src="images/scroll_right.png" />
         </button>
       </div>
 
@@ -91,6 +84,20 @@
       </div>
     </div>
   </body>
-  <script>javascript:(function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.getElementById('fps').prepend(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='https://mrdoob.github.io/stats.js/build/stats.min.js';document.head.appendChild(script);})()</script>
+  <script>
+    var script = document.createElement('script');
+    script.onload = ( ) => {
+      var stats = new Stats( );
+      document.getElementById( 'fps' ).prepend( stats.dom );
+      requestAnimationFrame(
+        function loop( ) {
+          stats.update( );
+          requestAnimationFrame( loop );
+        }
+      );
+    };
+    script.src = 'https://mrdoob.github.io/stats.js/build/stats.min.js';
+    document.head.appendChild( script );
+  </script>
   <script type="module" src="main.js"></script>
 </html>

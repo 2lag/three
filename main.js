@@ -55,8 +55,7 @@ function loadWad( ) {
 function parseQuakeMapLine( line ) {
   const match = line.match( quake_line_regex );
 
-  if ( !match )
-    return null;
+  if ( !match ) return null;
 
   return {
     type: "QUAKE",
@@ -73,8 +72,7 @@ function parseQuakeMapLine( line ) {
 function parseValveMapLine( line ) {
   const match = line.match( valve_line_regex );
 
-  if ( !match )
-    return null;
+  if ( !match ) return null;
 
   return {
     type: "VALVE",
@@ -231,15 +229,22 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   const ctx = canvas.getContext( "2d" );
   const img_data = ctx.createImageData( width, height );
 
+  let balpha = false;
   for ( let idx = 0; idx < data.length; ++idx ) {
     const palette_idx = data[ idx ];
     const [ r, g, b ] = palette[ palette_idx ];
     const i = idx * 4;
 
+    let alpha = 255;
+    if ( name.startsWith( "glass" ) ) {
+      balpha = true;
+      alpha = 128;
+    }
+
     img_data.data[ i + 0 ] = r;
     img_data.data[ i + 1 ] = g;
     img_data.data[ i + 2 ] = b;
-    img_data.data[ i + 3 ] = 255;
+    img_data.data[ i + 3 ] = alpha;
   }
 
   ctx.putImageData( img_data, 0, 0 );
@@ -255,6 +260,7 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
   const texture = new THREE.Texture( canvas );
   texture.minFilter = texture.magFilter = THREE.NearestFilter;
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.premultiplyAlpha = balpha;
   texture.needsUpdate = true;
   texture.flipY = false;
   texture.name = name;
@@ -291,16 +297,71 @@ async function updateProgress( progress ) {
   await new Promise( r => setTimeout( r, 0 ) );
 }
 
-async function parseMap( is_valve_fmt, wad ) {
+function getSpawn( block, line ) {
+  if ( !block.includes( "info_player_" ) )
+    return false;
+
+  const match = line.match( origin_regex );
+
+  if ( !match ) return false;
+
+  setCamPos(
+    parseFloat( match[ 1 ] ),
+    parseFloat( match[ 2 ] ),
+    parseFloat( match[ 3 ] )
+  );
+
+  return true;
+}
+
+function updateTextureList( fd, textures, unique_textures, wad, is_valve_fmt ) {
+  if ( !textures.has( fd.texture ) ) {
+    if ( !unique_textures.has( fd.texture ) ) {
+      const matching_texture = wad.getTextureFromName( fd.texture, is_valve_fmt );
+      if ( !matching_texture ) {
+        console.error( `failed to find texture '${ fd.texture }' in wad dir` );
+        return false;
+      }
+
+      const texture = createTextureFromMip( matching_texture, is_valve_fmt );
+      textures.set( fd.texture, texture );
+      unique_textures.add( fd.texture );
+    }
+  }
+  return true;
+}
+
+function getMergedBrushes( textures, geometries ) {
+  const brushes = new THREE.Group( );
+  const keys = Array.from( geometries.keys( ) );
+  for ( let g_idx = 0; g_idx < keys.length; ++g_idx ) {
+    const tex_name = keys[ g_idx ];
+    const geoms = geometries.get( tex_name );
+    const merged_geoms = BufferGeometryUtils.mergeGeometries( geoms, true );
+    const texture = textures.get( tex_name );
+    const face_mtl = new THREE.MeshBasicMaterial({
+      transparent: texture.premultiplyAlpha,
+      side: THREE.FrontSide,
+      map: texture
+    });
+
+    const merged_mesh = new THREE.Mesh( merged_geoms, face_mtl );
+    brushes.add( merged_mesh );
+  }
+  return brushes;
+}
+
+async function parseMap( wad, is_valve_fmt ) {
   const unique_textures = new Set( );
-  const texture_list = new Map( );
+  const textures = new Map( );
   const map = new THREE.Group( );
   let spawn_found = false;
 
   const blocks = map_data.split( "}" ).join( "" )
-                    .split( "{" )
-                    .map( b => b.trim( ) ).filter( b => b )
-                    .filter( b => b.includes( '(' ) || b.includes( 'info_player_' ) );
+                         .split( "{" )
+                         .map( b => b.trim( ) )
+                         .filter( b => b )
+                         .filter( b => b.includes( '(' ) || b.includes( 'info_player_' ) );
 
   let updates = 0;
   let progress_track = getProgress( );
@@ -322,28 +383,13 @@ async function parseMap( is_valve_fmt, wad ) {
     for ( let l_idx = 0; l_idx < lines.length; ++l_idx ) {
       const line = lines[ l_idx ];
 
-      if ( !spawn_found && line.startsWith( '"origin"' ) ) {
-        if ( !block.includes( "info_player_" ) )
-          continue;
-
-        const match = line.match( origin_regex );
-
-        if ( !match )
-          continue;
-
-        spawn_found = true;
-
-        setCamPos(
-          parseFloat( match[ 1 ] ),
-          parseFloat( match[ 2 ] ),
-          parseFloat( match[ 3 ] )
-        );
-      }
+      if ( !spawn_found && line.startsWith( '"origin"' ) )
+        spawn_found = getSpawn( block, line );
 
       if ( !line.startsWith( "(" ) )
         continue;
 
-      let data = ( is_valve_fmt )
+      const data = ( is_valve_fmt )
         ? parseValveMapLine( line )
         : parseQuakeMapLine( line );
 
@@ -379,21 +425,10 @@ async function parseMap( is_valve_fmt, wad ) {
         continue;
       }
 
-      if ( !texture_list.has( fd.texture ) ) {
-        if ( !unique_textures.has( fd.texture ) ) {
-          const matching_texture = wad.getTextureFromName( fd.texture, is_valve_fmt );
-          if ( !matching_texture ) {
-            console.error( `failed to find texture '${ fd.texture }' in wad dir` );
-            continue;
-          }
+      const updated = updateTextureList( fd, textures, unique_textures, wad, is_valve_fmt );
+      if ( !updated ) continue;
 
-          const texture = createTextureFromMip( matching_texture, is_valve_fmt );
-          texture_list.set( fd.texture, texture );
-          unique_textures.add( fd.texture );
-        }
-      }
-
-      const texture = texture_list.get( fd.texture );
+      const texture = textures.get( fd.texture );
       const face_geometry = createFaceGeometry( face_verts, fd, texture );
       
       if ( !geometries.has( fd.texture ) )
@@ -402,23 +437,9 @@ async function parseMap( is_valve_fmt, wad ) {
       geometries.get( fd.texture ).push( face_geometry );
     }
     
-    const brushes = new THREE.Group( );
-    const keys = Array.from( geometries.keys( ) );
-    for ( let g_idx = 0; g_idx < keys.length; ++g_idx ) {
-      const tex_name = keys[ g_idx ];
-      const geoms = geometries.get( tex_name );
-      const merged_geoms = BufferGeometryUtils.mergeGeometries( geoms, true );
-      const texture = texture_list.get( tex_name );
-      const face_mtl = new THREE.MeshBasicMaterial({
-        side: THREE.FrontSide,
-        map: texture
-      });
-
-      const merged_mesh = new THREE.Mesh( merged_geoms, face_mtl );
-      brushes.add( merged_mesh );
-    }
-
-    map.add( brushes );
+    map.add(
+      getMergedBrushes( textures, geometries )
+    );
   }
   
   sortTexturesById( );
@@ -445,12 +466,12 @@ function extractFirstWadName( ) {
 }
 
 async function loadMap( ) {
-  const valve_map = map_data.includes( "[" ) || map_data.includes( "]" );
+  const is_valve_fmt = map_data.includes( "[" ) || map_data.includes( "]" );
   const wad = loadWad( );
 
   setProgress( 20 );
 
-  return await parseMap( valve_map, wad );
+  return await parseMap( wad, is_valve_fmt );
 }
 
 async function loadDefaultMap( map ) {

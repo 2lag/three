@@ -1,7 +1,13 @@
 ### todo
- - clean main.js ( just parseMap & mapFileChange )
+ - clean main.js ( just parseMap )
    - no functions longer than 60 lines, no wider than 80-90 chars
    - split up into files more, util file, etc if needed
+
+ - look through again make sure funcs are less than 60 lines
+
+ - fix view bounds ( limit up/down & normalize movement so that holding space while looking straight down still moves up, not forward )
+
+ - multiply movement and looking by delta time to properly have a consistent move / look speed
 
  - make progress functionality cleaner w/o hardcode vals
  
@@ -20,10 +26,8 @@
  - integrate to kuso.day/map.html ( test on mobile then update "work" cmd onsite w/ this + axonbox, then post on twt )
    - see if u can auto pull from this repo when it updates w/ github actions
 
-
 SHOUT OUT : https://github.com/x8BitRain/webhl FOR GOLDSRC CSS
 SHOUT OUT : https://github.com/sbuggay/bspview/ FOR CAMERA CONTROLLER BASE ( comes from Mr. James Baicoianu )
 
 future todo :
  - add quake ui for quake .maps
- - 

@@ -223,6 +223,18 @@ label:active {
   display: flex;
 }
 
+#btn_container > button,
+#btn_container > div > button {
+  height: 48px;
+  width: 48px;
+}
+
+#btn_container > button > img,
+#btn_container > div > button > img {
+  height: 32px;
+  width: 32px;
+}
+
 #joystick_container {
   background-color: transparent;
   max-height: 128px;
