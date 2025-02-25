@@ -1,9 +1,6 @@
 ### todo
- - fix view bounds ( limit up/down & normalize movement so that holding space while looking straight down still moves up, not forward )
-
- - multiply movement and looking by delta time to properly have a consistent move / look speed
-
  - make progress functionality cleaner w/o hardcode vals
+   - go through all setprogress calls
  
  - go thru any remaining comments
 
@@ -20,8 +17,9 @@
  - integrate to kuso.day/map.html ( test on mobile then update "work" cmd onsite w/ this + axonbox, then post on twt )
    - see if u can auto pull from this repo when it updates w/ github actions
 
-SHOUT OUT : https://github.com/x8BitRain/webhl FOR GOLDSRC CSS
-SHOUT OUT : https://github.com/sbuggay/bspview/ FOR CAMERA CONTROLLER BASE ( comes from Mr. James Baicoianu )
+### thrown together tool for visualizing & validating my engine's .maps
+SHOUT OUT : https://github.com/x8BitRain/webhl FOR GOLDSRC CSS  
+SHOUT OUT : https://github.com/sbuggay/bspview/ FOR CAMERA CONTROLLER BASE ( comes from Mr. James Baicoianu )  
 
-future todo :
- - add quake ui for quake .maps
+future todo :  
+ - add quake ui css for quake .maps

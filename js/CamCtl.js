@@ -17,6 +17,7 @@ let control_checkbox,
 
 const x_axis = new THREE.Vector3( 1, 0, 0 );
 const y_axis = new THREE.Vector3( 0, 0, 1 );
+const HALF_PI = Math.PI * 0.5;
 let joystick_interval = null;
 let last_event = null;
 
@@ -25,6 +26,7 @@ export class CamCtl {
     this.domElement = domElement;
     this.camera = camera;
     
+    this.pitch = 0;
     this.hotkeys = { };
     this.rollSpeed = 0.005;
     this.movementSpeed = 50;
@@ -68,7 +70,7 @@ export class CamCtl {
   _virtualMousemove( event ) {
     const { movementX, movementY } = event.detail;
     
-    this.camera.rotateOnAxis( x_axis, movementY );
+    this.camera.rotateOnAxis( x_axis, this.limitPitch( movementY, true ) );
     this.camera.rotateOnWorldAxis( y_axis, movementX );
   }
 
@@ -119,8 +121,21 @@ export class CamCtl {
     if ( !this.controlsFocused )
       return;
 
-    this.camera.rotateOnAxis( x_axis, event.movementY * -0.002 );
+    this.camera.rotateOnAxis( x_axis, this.limitPitch( event.movementY, false ) );
     this.camera.rotateOnWorldAxis( y_axis, event.movementX * -0.002 );
+  }
+
+  limitPitch( movementY, virtual ) {
+    const movement = movementY * ( virtual ? 1.2 : -0.002 );
+
+    const new_pitch = THREE.MathUtils.clamp(
+      this.pitch + movement,
+      -HALF_PI, HALF_PI
+    );
+
+    const clamped_delta = new_pitch - this.pitch;
+    this.pitch = new_pitch;
+    return clamped_delta;
   }
 
   toggleFullscreen( ) {
@@ -162,13 +177,11 @@ export class CamCtl {
   }
 
   updateMovementVector( ) {
-    let fwd = this.moveState.fwd || ( false && !this.moveState.back ) ? 1 : 0;
+    const x = this.moveState.right - this.moveState.left;
+    const y = this.moveState.up - this.moveState.down;
+    const z = this.moveState.back - this.moveState.fwd;
 
-    this.moveVector.set(
-      -this.moveState.left + this.moveState.right,
-      -this.moveState.down + this.moveState.up,
-      -fwd + this.moveState.back
-    );
+    this.moveVector.set( x, y, z );
   }
 
   bind( scope, fn ) {
