@@ -6,6 +6,7 @@
 
  - make loading/parsing & running faster
    - profile site w chromium tools ( all looks good on ff )
+     - compare using v0/v1/v2 globals vs recreating for every vert
 
  - fix textures, still not 100% correct ( ONLY ON LIKE SOME QUAKE FACES )
    - all seem to be inverted horizontally, and some seem to be offset improperly, but trenchbroom has no issue rendering so i don't know where the problem lies
