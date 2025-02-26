@@ -1,8 +1,4 @@
 ### todo
- - make loading/parsing & running faster
-   - processFaces is significantly heavier than processBlocks ( createFaceGeometry, updateTextureList, and getFacePolygon are the heaviest )
-   - in process block, computeBrushVertices also takes up a little bit of time
-
  - fix textures, still not 100% correct ( ONLY ON LIKE SOME QUAKE FACES )
    - all seem to be inverted horizontally, and some seem to be offset improperly, but trenchbroom has no issue rendering so i don't know where the problem lies
    - [here](https://github.com/TrenchBroom/TrenchBroom/blob/master/common/src/mdl/UVCoordSystem.h) || [here](https://github.com/TrenchBroom/TrenchBroom/blob/master/common/src/mdl/MapFormat.cpp)

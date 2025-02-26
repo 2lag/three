@@ -160,9 +160,9 @@ function computeUVForVertex( vertex, line_data, texture ) {
 }
 
 function createFaceGeometry( verts, face_data, texture ) {
-  const positions = [ ];
+  const positions = new Float32Array( verts.length * 3 );
+  const uvs = new Float32Array( verts.length * 2 );
   const indices = [ ];
-  const uvs = [ ];
 
   getUVAxis( face_data.plane.normal );
 
@@ -173,8 +173,11 @@ function createFaceGeometry( verts, face_data, texture ) {
     const vert = verts[ v_idx ];
 
     computeUVForVertex( vert, face_data, texture );
-    positions.push( vert.x, vert.y, vert.z );
-    uvs.push( uv.x, uv.y );
+    positions[ v_idx * 3 + 0 ] = vert.x;
+    positions[ v_idx * 3 + 1 ] = vert.y;
+    positions[ v_idx * 3 + 2 ] = vert.z;
+    uvs[ v_idx * 2 + 0 ] = uv.x;
+    uvs[ v_idx * 2 + 1 ] = uv.y;
   }
   
   for ( let t_idx = 0; t_idx < triangles.length; ++t_idx ) {
@@ -183,8 +186,8 @@ function createFaceGeometry( verts, face_data, texture ) {
   }
   
   const geometry = new THREE.BufferGeometry( );
-  geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
-  geometry.setAttribute( 'uv', new THREE.Float32BufferAttribute( uvs, 2 ) );
+  geometry.setAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
+  geometry.setAttribute( 'uv', new THREE.BufferAttribute( uvs, 2 ) );
   geometry.setIndex( indices );
   geometry.computeVertexNormals( );
   return geometry;
@@ -228,23 +231,20 @@ function createTextureFromMip( mip_tex, is_valve_fmt ) {
 
   const ctx = canvas.getContext( "2d" );
   const img_data = ctx.createImageData( width, height );
-
+  
   let balpha = false;
+  const pixel_data = img_data.data;
+  const alpha = name.startsWith( "glass" )
+    ? ( balpha = true, 128 )
+    : 255;
+
+  let i = 0;
   for ( let idx = 0; idx < data.length; ++idx ) {
-    const palette_idx = data[ idx ];
-    const [ r, g, b ] = palette[ palette_idx ];
-    const i = idx * 4;
-
-    let alpha = 255;
-    if ( name.startsWith( "glass" ) ) {
-      balpha = true;
-      alpha = 128;
-    }
-
-    img_data.data[ i + 0 ] = r;
-    img_data.data[ i + 1 ] = g;
-    img_data.data[ i + 2 ] = b;
-    img_data.data[ i + 3 ] = alpha;
+    const [ r, g, b ] = palette[ data[ idx ] ];
+    pixel_data[ i++ ] = r;
+    pixel_data[ i++ ] = g;
+    pixel_data[ i++ ] = b;
+    pixel_data[ i++ ] = alpha;
   }
 
   ctx.putImageData( img_data, 0, 0 );
