@@ -1,8 +1,7 @@
 /**
- * @author James Baicoianu / http://www.baicoianu.com/
+ * @author James Baicoianu / http://www.baicoianu.com/ ( Original )
+ * @author day / https://kuso.day/ ( Modified & JS Port )
  */
-
-// translated to JS & expanded by day | https://kuso.day/ ))
 
 import * as THREE from "three";
 

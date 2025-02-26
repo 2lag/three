@@ -1,12 +1,7 @@
 ### todo
- - make progress functionality cleaner w/o hardcode vals
-   - go through all setprogress calls
- 
- - go thru any remaining comments
-
  - make loading/parsing & running faster
-   - profile site w chromium tools ( all looks good on ff )
-     - compare using v0/v1/v2 globals vs recreating for every vert
+   - processFaces is significantly heavier than processBlocks ( createFaceGeometry, updateTextureList, and getFacePolygon are the heaviest )
+   - in process block, computeBrushVertices also takes up a little bit of time
 
  - fix textures, still not 100% correct ( ONLY ON LIKE SOME QUAKE FACES )
    - all seem to be inverted horizontally, and some seem to be offset improperly, but trenchbroom has no issue rendering so i don't know where the problem lies

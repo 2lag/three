@@ -425,6 +425,8 @@ function getMergedBrushes( textures, geometries ) {
 }
 
 async function parseMap( wad, is_valve_fmt ) {
+  setProgress( 0 );
+
   const blocks = splitMapBrushBlocks( );
   const unique_textures = new Set( );
   const geometries = new Map( );
@@ -484,37 +486,23 @@ function extractFirstWadName( ) {
 async function loadMap( ) {
   const is_valve_fmt = map_data.includes( "[" ) || map_data.includes( "]" );
   const wad = loadWad( );
-
-  setProgress( 20 );
-
   return await parseMap( wad, is_valve_fmt );
 }
 
 async function loadDefaultMap( map ) {
   try {
     const map_file = await fetch( map );
-
-    setProgress( 3 );
-
     map_data = await map_file.text( );
 
-    setProgress( 6 );
-
     const wad_name = extractFirstWadName( );
-
     if ( !wad_name )
       throw new Error( `Failed to find WAD in ${ map }` );
 
     const wad_file = await fetch( wad_name );
-
-    setProgress( 10 );
-
     wad_data = await wad_file.arrayBuffer( );
 
-    setProgress( 15 );
-
     const loaded = await loadMap( );
-    
+
     if ( loaded ) {
       setHudNames(
         map.split( "/" ).slice( -1 )[ 0 ],
@@ -586,8 +574,7 @@ function toggleSideCollapsibleSection( e ) {
 
 async function mapFileChange( e ) {
   const files = e.target.files;
-  setProgress( 0 );
-
+  
   let file, map_found = false;
   for ( let idx = 0; idx < files.length; ++idx ) {
     const f = files[ idx ];
@@ -602,13 +589,9 @@ async function mapFileChange( e ) {
     if ( !map_found )
       throw new Error( "No map found" );
 
-    setProgress( 1 );
-
     map_data = await file.text( );
     const wad_name = extractFirstWadName( );
 
-    setProgress( 5 );
-  
     if ( !wad_name || !wad_name.endsWith( '.wad' ) )
       throw new Error( `WAD name not found in ${ file.name }` );
   
@@ -626,12 +609,10 @@ async function mapFileChange( e ) {
   prev_map_selection = dom_map_picker.options[ dom_map_picker.selectedIndex ].text;
   dom_map_picker.selectedIndex = dom_map_picker.length - 1;
   
-  setProgress( 8 );
   scene.clear( );
   clearTextures( );
   setWireframeOff( );
   setMapName( file.name );
-  setProgress( 13 );
   
   await loadMap( );
 }
