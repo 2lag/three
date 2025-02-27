@@ -14,33 +14,25 @@ import {
   toggleSettings, isSettingsActive
 } from './js/DOMUtil.js';
 
+// #region Constants
 const valve_line_regex = /^\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s+(\S+)\s+\[\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+\]\s+\[\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+\]\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/;
 const quake_line_regex = /^\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s*\(\s*(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s*\)\s+(\S+)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/;
 const origin_regex = /"origin"\s*"(-?\d+)\s+(-?\d+)\s+(-?\d+)"/;
 const wad_regex = /^"wad"\s*"([^";]+?\.wad)(?=;|")/;
-
 const quake_palette = getQuakePalette( );
-
 const HALF_PI = Math.PI * 0.5;
 const UPDATE_TIME = 1 / 20;
 const PROGRESS_STEPS = 27;
 const FLT_EPSILON = 1e-6;
+// #endregion
 
+// #region Globals
 let dom_map_picker, dom_wireframe;
 let map_data = "", wad_data = "";
 
-const ci_term0 = new THREE.Vector3( );
-const ci_term1 = new THREE.Vector3( );
-const ci_term2 = new THREE.Vector3( );
-const u_vec3 = new THREE.Vector3( );
-const v_vec3 = new THREE.Vector3( );
-/* vivek ramaswamy mentioned ?? */
 const scene = new THREE.Scene( );
-const v0 = new THREE.Vector3( );
-const v1 = new THREE.Vector3( );
-const v2 = new THREE.Vector3( );
-const uv = new THREE.Vector3( );
 let controls, renderer, cam;
+// #endregion
 
 function loadWad( ) {
   const parser = new WadParser( wad_data );
@@ -59,9 +51,9 @@ function parseQuakeMapLine( line ) {
 
   return {
     type: "QUAKE",
-    v0: v0.set( Number( match[ 1 ] ), Number( match[ 2 ] ), Number( match[ 3 ] ) ),
-    v1: v1.set( Number( match[ 4 ] ), Number( match[ 5 ] ), Number( match[ 6 ] ) ),
-    v2: v2.set( Number( match[ 7 ] ), Number( match[ 8 ] ), Number( match[ 9 ] ) ),
+    v0: new THREE.Vector3( Number( match[ 1 ] ), Number( match[ 2 ] ), Number( match[ 3 ] ) ),
+    v1: new THREE.Vector3( Number( match[ 4 ] ), Number( match[ 5 ] ), Number( match[ 6 ] ) ),
+    v2: new THREE.Vector3( Number( match[ 7 ] ), Number( match[ 8 ] ), Number( match[ 9 ] ) ),
     texture: match[ 10 ],
     uv_offset: new THREE.Vector2( Number( match[ 11 ] ), Number( match[ 12 ] ) ),
     rotation: Number( match[ 13 ] ),
@@ -76,9 +68,9 @@ function parseValveMapLine( line ) {
 
   return {
     type: "VALVE",
-    v0: v0.set( Number( match[ 1 ] ), Number( match[ 2 ] ), Number( match[ 3 ] ) ),
-    v1: v1.set( Number( match[ 4 ] ), Number( match[ 5 ] ), Number( match[ 6 ] ) ),
-    v2: v2.set( Number( match[ 7 ] ), Number( match[ 8 ] ), Number( match[ 9 ] ) ),
+    v0: new THREE.Vector3( Number( match[ 1 ] ), Number( match[ 2 ] ), Number( match[ 3 ] ) ),
+    v1: new THREE.Vector3( Number( match[ 4 ] ), Number( match[ 5 ] ), Number( match[ 6 ] ) ),
+    v2: new THREE.Vector3( Number( match[ 7 ] ), Number( match[ 8 ] ), Number( match[ 9 ] ) ),
     texture: match[ 10 ],
     u: new THREE.Vector4( Number( match[ 11 ] ), Number( match[ 12 ] ), Number( match[ 13 ] ), Number( match[ 14 ] ) ),
     v: new THREE.Vector4( Number( match[ 15 ] ), Number( match[ 16 ] ), Number( match[ 17 ] ), Number( match[ 18 ] ) ),
@@ -97,9 +89,9 @@ function computeIntersection( p0, p1, p2 ) {
   if ( Math.abs( denominator ) < FLT_EPSILON )
     return null;
 
-  ci_term0.crossVectors( n1, n2 ).multiplyScalar( -p0.constant );
-  ci_term1.crossVectors( n2, n0 ).multiplyScalar( -p1.constant );
-  ci_term2.crossVectors( n0, n1 ).multiplyScalar( -p2.constant );
+  const ci_term0 = new THREE.Vector3( ).crossVectors( n1, n2 ).multiplyScalar( -p0.constant );
+  const ci_term1 = new THREE.Vector3( ).crossVectors( n2, n0 ).multiplyScalar( -p1.constant );
+  const ci_term2 = new THREE.Vector3( ).crossVectors( n0, n1 ).multiplyScalar( -p2.constant );
 
   return new THREE.Vector3( ).add( ci_term0 ).add( ci_term1 ).add( ci_term2 ).divideScalar( denominator );
 }
@@ -117,18 +109,35 @@ function isPointInsideBrush( point, planes ) {
 
 const TAN_001 = new THREE.Vector3( 0, 0, 1 );
 const TAN_010 = new THREE.Vector3( 0, 1, 0 );
-function getUVAxis( normal ) {
+function getValveUVAxis( normal ) {
   const tangent = Math.abs( normal.dot( TAN_001 ) ) > 0.99 ? TAN_010 : TAN_001;
-  u_vec3.crossVectors( normal, tangent ).normalize( );
-  v_vec3.crossVectors( normal, u_vec3  ).normalize( );
+  const u_vec3 = new THREE.Vector3( ).crossVectors( normal, tangent ).normalize( );
+  const v_vec3 = new THREE.Vector3( ).crossVectors( normal, u_vec3  ).normalize( );
+  return { u_vec3, v_vec3 };
 }
 
-/*
-In the original Quake engine, materials are projected onto brush faces along the axes of the coordinate system. In practice, the engine (the compiler, to be precise), uses the normal of a brush face to determine the projection axis - the chose axis is the one that has the smallest angle with the face’s normal. Then, the material is projected onto the brush face along that axis. This leads to some distortion (shearing) that is particularly apparent for slanted brush faces where the face’s normal is linearly dependent on all three coordinate system axes. However, this type of projection, which we call paraxial projection in TrenchBroom, also has an advantage: If the face’s normal is linearly dependent on only two or less coordinate system axes (that is, it lies in the plane defined by two of the axes, e.g., the XY plane), then the paraxial projection ensures that the material still fits the brush faces without having to change the scaling factors.
-The main disadvantage of paraxial projection is that it is impossible to do perfect alignment locking. Alignment locking means that the material remains perfectly in place on the brush faces during all transformations of the face. For example, if the brush moves by 16 units along the X axis, then the materials on all faces of the brush do not move relatively to the brush. With paraxial projection, materials may become distorted due to the face normals changing by the transformation, but it is impossible to compensate for that shearing.
-This is (probably) one of the reasons why the Valve 220 map format was introduced for Half Life. This map format extends the brush faces with additional information about the UV axes for each brush faces. In principle, this makes it possible to have arbitrary linear transformations for the UV coordinates due to their projection, but in practice, most editors keep the UV axes perpendicular to the face normals. In that case, the material is projected onto the face along the normal of the face (and not a coordinate system axis). In TrenchBroom, this mode of projection is called parallel projection, and it is only available in maps that have the Valve 220 map format.
-*/
+function getQuakeUVAxis( normal ) {
+  let u, v;
+  const abs_x = Math.abs( normal.x );
+  const abs_y = Math.abs( normal.y );
+  const abs_z = Math.abs( normal.z );
+
+  if ( abs_z >= abs_x && abs_z >= abs_y ) {
+    u = new THREE.Vector3( 1,  0, 0 );
+    v = new THREE.Vector3( 0, -1, 0 );
+  } else if ( abs_x >= abs_y ) {
+    u = new THREE.Vector3( 0, 1,  0 );
+    v = new THREE.Vector3( 0, 0, -1 );
+  } else {
+    u = new THREE.Vector3( 1, 0,  0 );
+    v = new THREE.Vector3( 0, 0, -1 );
+  }
+
+  return { u_vec3: u, v_vec3: v };
+}
+
 function computeUVForVertex( vertex, line_data, texture ) {
+  const { u_vec3, v_vec3 } = getQuakeUVAxis( line_data.plane.normal );
   let uv_offset;
 
   if ( line_data.type === "VALVE" ) {
@@ -136,9 +145,7 @@ function computeUVForVertex( vertex, line_data, texture ) {
     u_vec3.set( line_data.u.x, line_data.u.y, line_data.u.z );
     v_vec3.set( line_data.v.x, line_data.v.y, line_data.v.z );
   } else {
-    getUVAxis( line_data.plane.normal );
     uv_offset = line_data.uv_offset;
-    u_vec3.negate( );
 
     const rotation = THREE.MathUtils.degToRad( line_data.rotation );
     const cos = Math.cos( rotation );
@@ -148,14 +155,12 @@ function computeUVForVertex( vertex, line_data, texture ) {
     v_vec3.copy( u_vec3.clone( ).multiplyScalar( sin ).add( v_vec3.clone( ).multiplyScalar( cos ) ) );
   }
   
-  uv.set(
-    vertex.dot( u_vec3 ) / line_data.uv_scale.x + uv_offset.x,
-    vertex.dot( v_vec3 ) / line_data.uv_scale.y + uv_offset.y
-  );
+  const u = vertex.dot( u_vec3 ) / line_data.uv_scale.x + uv_offset.x;
+  const v = vertex.dot( v_vec3 ) / line_data.uv_scale.y + uv_offset.y;
   
-  uv.set(
-    uv.x / texture.image.width,
-    uv.y / texture.image.height
+  return new THREE.Vector2(
+    u / texture.image.width,
+    v / texture.image.height
   );
 }
 
@@ -164,7 +169,7 @@ function createFaceGeometry( verts, face_data, texture ) {
   const uvs = new Float32Array( verts.length * 2 );
   const indices = [ ];
 
-  getUVAxis( face_data.plane.normal );
+  const { u_vec3, v_vec3 } = getValveUVAxis( face_data.plane.normal );
 
   const verts_2d = verts.map( v => new THREE.Vector2( v.dot( u_vec3 ), v.dot( v_vec3 ) ) );
   const triangles = THREE.ShapeUtils.triangulateShape( verts_2d, [ ] );
@@ -172,7 +177,7 @@ function createFaceGeometry( verts, face_data, texture ) {
   for ( let v_idx = 0; v_idx < verts.length; ++v_idx ) {
     const vert = verts[ v_idx ];
 
-    computeUVForVertex( vert, face_data, texture );
+    const uv = computeUVForVertex( vert, face_data, texture );
     positions[ v_idx * 3 + 0 ] = vert.x;
     positions[ v_idx * 3 + 1 ] = vert.y;
     positions[ v_idx * 3 + 2 ] = vert.z;
@@ -202,7 +207,7 @@ function getFacePolygon( fd, verts ) {
   if ( face_verts.length < 3 )
     return null;
 
-  getUVAxis( plane.normal );
+  const { u_vec3, v_vec3 } = getValveUVAxis( plane.normal );
   
   let center = new THREE.Vector2( 0, 0 );
   const face_verts_2d = face_verts.map( v => new THREE.Vector2( v.dot( u_vec3 ), v.dot( v_vec3 ) ) );
