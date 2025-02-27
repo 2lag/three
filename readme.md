@@ -4,3 +4,4 @@ SHOUT OUT : https://github.com/sbuggay/bspview/ FOR CAMERA CONTROLLER BASE ( com
 
 potential future todo :  
  - add quake ui css for quake .maps
+ - support multiple wads ( or make a wad merger )
